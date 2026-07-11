@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Cricket runtime data lives outside the repo and is synced to:
+# /mnt/c/MMM/data/Mom/Subaru
+data/
+reports/
+
+# Local scratch files
+.DS_Store

@@ -1,0 +1,102 @@
+buyer:
+  location_zip: "98026"
+  location_label: "Edmonds, WA"
+  preferred_dealers:
+    - "Carter Subaru Shoreline"
+    - "Carter Subaru Ballard"
+
+data_store:
+  windows_root: "/mnt/c/MMM/data/Mom/Subaru"
+  sync_on_report: true
+
+vehicle:
+  make: "Subaru"
+  model: "Crosstrek"
+  years_min: 2020
+  years_max: 2024
+  preferred_years: [2021, 2022, 2023, 2024]
+  required_trim_primary: "Limited"
+  allowed_trims_if_features_confirmed:
+    - "Limited"
+    - "Sport"
+    - "Premium"
+  max_mileage: 45000
+  required_drivetrain: "AWD"
+  required_transmission: "Automatic/CVT"
+
+features:
+  required:
+    - "rear camera"
+    - "blind spot detection"
+    - "rear cross-traffic alert"
+    - "reverse automatic braking"
+  treat_rab_as_separate_required_feature: true
+
+color_preferences:
+  highest:
+    - "blue"
+    - "teal"
+  med_high:
+    - "burgundy"
+    - "green"
+  med:
+    - "white"
+  low:
+    - "black"
+    - "silver"
+    - "gray"
+
+search:
+  initial_scope: "tier1_only"
+  primary_radius_miles: 50
+  secondary_radius_miles: 100
+  tertiary_radius_miles: 200
+  include_tier1_sources: true
+  include_tier2_sources: false
+  include_tier3_sources: false
+  include_private_sellers: false
+  include_craigslist: false
+  include_facebook_marketplace: false
+  include_oregon: true
+
+sources:
+  tier1:
+    - name: "Carter Subaru Shoreline used inventory"
+      adapter: "carter"
+      dealer_name: "Carter Subaru Shoreline"
+      dealer_type: "Subaru dealer"
+      location: "Seattle, WA"
+      distance_miles: 7
+      url: "https://www.cartersubarushoreline.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
+      sitemap_urls:
+        - "https://www.cartersubarushoreline.com/resrc/xmlsitemap/sitemap-inventory-search/edmonds-wa-98020/"
+        - "https://www.cartersubarushoreline.com/resrc/xmlsitemap/sitemap-inventory-search/seattle-wa-98133/"
+    - name: "Carter Subaru Ballard / Carter Subaru group inventory"
+      adapter: "carter"
+      dealer_name: "Carter Subaru Ballard"
+      dealer_type: "Subaru dealer"
+      location: "Seattle, WA"
+      distance_miles: 13
+      url: "https://www.cartersubaru.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
+    - name: "Subaru certified pre-owned inventory"
+      adapter: "subaru_cpo"
+      dealer_name: "Subaru Certified Pre-Owned"
+      dealer_type: "Subaru CPO dealer"
+      location: "Washington"
+      distance_miles:
+      url: "https://www.subaru.com/vehicles/certified-pre-owned.html"
+    - name: "Local Subaru dealership websites"
+      adapter: "local_subaru"
+      dealer_name: "Local Subaru dealers"
+      dealer_type: "Subaru dealer"
+      location: "Western WA"
+      distance_miles:
+      urls:
+        - "https://www.walkersrentonsubaru.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
+        - "https://www.marysvillesubaru.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
+        - "https://www.tacomassubaru.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
+        - "https://www.subaruofpuyallup.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
+
+scoring:
+  watchlist_threshold: 70
+  exclude_below: 50
