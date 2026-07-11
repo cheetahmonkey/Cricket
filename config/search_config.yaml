@@ -6,7 +6,7 @@ buyer:
     - "Carter Subaru Ballard"
 
 data_store:
-  windows_root: "/mnt/c/MMM/data/Mom/Subaru"
+  windows_root: "/mnt/c/MMM/data/Mom/Cricket"
   sync_on_report: true
 
 vehicle:
