@@ -21,6 +21,27 @@ def dedupe(listings: List[Listing]) -> List[Listing]:
     return list(seen.values())
 
 
+def apply_manual_overrides(listing: Listing, config: Dict) -> None:
+    overrides = config.get("manual_listing_overrides", {})
+    prices = overrides.get("prices", {}) if isinstance(overrides, dict) else {}
+    if not isinstance(prices, dict):
+        return
+
+    normalized_prices = {str(key).strip("'\""): value for key, value in prices.items()}
+    price = (
+        normalized_prices.get(listing.listing_id or "")
+        or normalized_prices.get(listing.key())
+        or normalized_prices.get(listing.source_url)
+    )
+    if price is None:
+        return
+
+    listing.price = int(price)
+    listing.price_confidence = "user_verified"
+    listing.raw["manual_price_override"] = listing.price
+    listing.notes.append("Price manually verified from dealer listing by user.")
+
+
 def run_search(config_path=DEFAULT_CONFIG_PATH) -> RunResult:
     config = load_config(config_path)
     date = datetime.now().strftime("%Y-%m-%d")
@@ -37,6 +58,7 @@ def run_search(config_path=DEFAULT_CONFIG_PATH) -> RunResult:
     qualified = []
     rejected = []
     for listing in dedupe(all_listings):
+        apply_manual_overrides(listing, config)
         infer_features(listing)
         score_listing(listing, config)
         ok, reason = apply_hard_filters(listing, config)

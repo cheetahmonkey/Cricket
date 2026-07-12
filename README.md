@@ -13,3 +13,9 @@ Generated reports and snapshots are runtime data. Cricket syncs them to the Wind
 ```text
 /mnt/c/MMM/data/Mom/Cricket
 ```
+
+The scheduled daily runner is:
+
+```bash
+/bin/bash /home/mmm/code/Mom/Subaru/scripts/run_daily_cricket.sh
+```

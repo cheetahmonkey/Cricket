@@ -71,13 +71,22 @@ sources:
       sitemap_urls:
         - "https://www.cartersubarushoreline.com/resrc/xmlsitemap/sitemap-inventory-search/edmonds-wa-98020/"
         - "https://www.cartersubarushoreline.com/resrc/xmlsitemap/sitemap-inventory-search/seattle-wa-98133/"
+      detail_text_url_template: "https://r.jina.ai/http://r.jina.ai/http://{url}"
+      max_detail_enrichments: 12
+      detail_direct_fallback_on_missing_price: true
     - name: "Carter Subaru Ballard / Carter Subaru group inventory"
       adapter: "carter"
       dealer_name: "Carter Subaru Ballard"
       dealer_type: "Subaru dealer"
       location: "Seattle, WA"
       distance_miles: 13
-      url: "https://www.cartersubaru.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
+      url: "https://www.cartersubaruballard.com/search/used-subaru-crosstrek-seattle-wa/?cy=98107&ct=60&md=3805&mk=60&tp=used"
+      sitemap_urls:
+        - "https://www.cartersubaruballard.com/resrc/xmlsitemap/sitemap-inventory-search/seattle-wa-98107/"
+        - "https://www.cartersubaruballard.com/resrc/xmlsitemap/sitemap-inventory-search/ballard-wa-98117/"
+      detail_text_url_template: "https://r.jina.ai/http://r.jina.ai/http://{url}"
+      max_detail_enrichments: 30
+      detail_direct_fallback_on_missing_price: true
     - name: "Subaru certified pre-owned inventory"
       adapter: "subaru_cpo"
       dealer_name: "Subaru Certified Pre-Owned"
@@ -100,3 +109,8 @@ sources:
 scoring:
   watchlist_threshold: 70
   exclude_below: 50
+
+manual_listing_overrides:
+  prices:
+    "122828072": 31300
+    "122741627": 28494

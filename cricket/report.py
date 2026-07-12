@@ -15,6 +15,10 @@ def miles(value):
     return format(value, ",") if value is not None else "Unknown"
 
 
+def table_cell(value) -> str:
+    return str(value).replace("\n", " ").replace("|", "\\|")
+
+
 def report_action(listing: Listing) -> str:
     if listing.feature_confidence == "confirmed":
         return "Verify history and out-the-door price"
@@ -47,6 +51,57 @@ def open_questions(listing: Listing) -> List[str]:
     if listing.feature_confidence != "confirmed":
         questions.insert(0, "Confirm Reverse Automatic Braking")
     return questions
+
+
+def vehicle_history_summary(listing: Listing) -> str:
+    owners = "%s owner%s" % (listing.owners, "" if listing.owners == 1 else "s") if listing.owners else "owners unknown"
+    accident = listing.accident_history or "unknown"
+    title = listing.title_status or "unknown"
+    return "%s; accident history %s; title %s" % (owners, accident, title)
+
+
+def rear_package_safety(listing: Listing) -> str:
+    features = []
+    if listing.reverse_automatic_braking == "yes":
+        features.append("RAB")
+    if listing.blind_spot_detection == "yes":
+        features.append("BSD")
+    if listing.rear_cross_traffic_alert == "yes":
+        features.append("RCTA")
+    return ", ".join(features) if features else "None confirmed"
+
+
+def safety_evidence_summary(listing: Listing) -> str:
+    evidence = listing.safety_evidence or {}
+    parts = []
+    for key in ("RAB", "BSD", "RCTA"):
+        if evidence.get(key):
+            parts.append("%s: %s" % (key, evidence[key]))
+    return "; ".join(parts)
+
+
+def markdown_link(label: str, url: str) -> str:
+    if not url:
+        return label
+    safe_label = label.replace("[", "(").replace("]", ")")
+    safe_url = url.replace(")", "%29")
+    return "[%s](%s)" % (safe_label, safe_url)
+
+
+def linked_color(listing: Listing) -> str:
+    color = listing.exterior_color or "Unknown"
+    return markdown_link(color, listing.source_url)
+
+
+def compact_dealer_name(listing: Listing) -> str:
+    dealer = listing.dealer_name or listing.source
+    dealer = dealer.replace("Carter Subaru Shoreline", "Carter Shoreline")
+    dealer = dealer.replace("Carter Subaru Ballard", "Carter Ballard")
+    return dealer
+
+
+def distance_summary(listing: Listing) -> str:
+    return "%s mi" % listing.distance_miles if listing.distance_miles is not None else "Unknown"
 
 
 def source_limitations(source_results: List[SourceResult]) -> List[str]:
@@ -102,24 +157,23 @@ def generate_report(
 
     lines.append("## Top Opportunities")
     if top:
-        lines.append("| Rank | Score | Year | Trim | Miles | Price | Color | Seller | Distance | Feature confidence | Action |")
-        lines.append("| ---: | ----: | ---- | ---- | ----: | ----: | ----- | ------ | -------: | ------------------ | ------ |")
+        lines.append("| Rank | Score | Year | Trim | Safety | Feature Confidence | Miles | Price | Color | Seller | Distance |")
+        lines.append("| ---: | ----: | ---- | ---- | ------ | ------------------ | ----: | ----: | ----- | ------ | -------: |")
         for index, listing in enumerate(top, start=1):
-            distance = "%s mi" % listing.distance_miles if listing.distance_miles is not None else "Unknown"
             lines.append(
                 "| %d | %d | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
                 % (
                     index,
                     listing.score,
                     listing.year or "Unknown",
-                    listing.trim or "Unknown",
+                    table_cell(listing.trim or "Unknown"),
+                    table_cell(rear_package_safety(listing)),
+                    table_cell(listing.feature_confidence),
                     miles(listing.mileage),
                     money(listing.price),
-                    listing.exterior_color or "Unknown",
-                    listing.dealer_name or listing.source,
-                    distance,
-                    listing.feature_confidence,
-                    report_action(listing),
+                    table_cell(linked_color(listing)),
+                    table_cell(compact_dealer_name(listing)),
+                    distance_summary(listing),
                 )
             )
         lines.append("")
@@ -135,7 +189,13 @@ def generate_report(
             lines.append("Color: %s - %s color tier  " % (listing.exterior_color or "Unknown", listing.color_score))
             lines.append("URL: %s  " % (listing.source_url or "Unknown"))
             lines.append("VIN: %s  " % (listing.vin or "Unknown"))
+            lines.append("Vehicle history: %s  " % vehicle_history_summary(listing))
+            if listing.history_report_url:
+                lines.append("History report: %s  " % listing.history_report_url)
             lines.append("Feature confidence: %s - %s  " % (listing.feature_confidence.title(), report_action(listing)))
+            safety_evidence = safety_evidence_summary(listing)
+            if safety_evidence:
+                lines.append("Safety evidence: %s  " % safety_evidence)
             lines.append("")
             lines.append("Why it ranks well:")
             for reason in why_listing(listing):
@@ -161,14 +221,27 @@ def generate_report(
         lines.append("- %s: %s" % (key, money(change)))
     lines.append("")
     lines.append("Rejected listings: %d" % len(rejected))
-    for listing in rejected[:30]:
-        label = "%s %s Subaru Crosstrek %s at %s" % (
-            listing.year or "Unknown",
-            listing.trim or "",
-            miles(listing.mileage),
-            listing.dealer_name or listing.source,
-        )
-        lines.append("- %s: %s" % (label.strip(), listing.reject_reason))
+    if rejected:
+        lines.append("")
+        lines.append("| # | Reason | Year | Trim | Safety | Feature Confidence | Miles | Price | Color | Seller | Distance |")
+        lines.append("| ---: | ------ | ---- | ---- | ------ | ------------------ | ----: | ----: | ----- | ------ | -------: |")
+        for index, listing in enumerate(rejected[:30], start=1):
+            lines.append(
+                "| %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (
+                    index,
+                    table_cell(listing.reject_reason or "rejected"),
+                    listing.year or "Unknown",
+                    table_cell(listing.trim or "Unknown"),
+                    table_cell(rear_package_safety(listing)),
+                    table_cell(listing.feature_confidence),
+                    miles(listing.mileage),
+                    money(listing.price),
+                    table_cell(linked_color(listing)),
+                    table_cell(compact_dealer_name(listing)),
+                    distance_summary(listing),
+                )
+            )
     if removed_keys:
         lines.append("")
         lines.append("Removed since prior history: %d" % len(removed_keys))

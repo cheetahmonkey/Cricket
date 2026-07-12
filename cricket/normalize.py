@@ -93,6 +93,13 @@ def listing_from_raw(raw: Dict[str, Any], source_defaults: Dict[str, Any]) -> Li
         vin=vin_match.group(0) if vin_match else clean_text(raw.get("vin") or ""),
         stock_number=clean_text(raw.get("stock_number") or raw.get("stockNumber") or ""),
         cpo=raw.get("cpo"),
+        owners=parse_int(raw.get("owners")),
+        history_report_url=clean_text(raw.get("history_report_url") or raw.get("carfax_url") or ""),
+        rear_camera=clean_text(raw.get("rear_camera") or "unknown"),
+        blind_spot_detection=clean_text(raw.get("blind_spot_detection") or "unknown"),
+        rear_cross_traffic_alert=clean_text(raw.get("rear_cross_traffic_alert") or "unknown"),
+        reverse_automatic_braking=clean_text(raw.get("reverse_automatic_braking") or "unknown"),
+        safety_evidence=raw.get("safety_evidence") if isinstance(raw.get("safety_evidence"), dict) else {},
         notes=[description] if description else [],
         raw=raw,
     )

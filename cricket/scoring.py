@@ -104,7 +104,8 @@ def score_listing(listing: Listing, config: Dict) -> Listing:
     }.get(listing.feature_confidence, 3)
 
     price_points = 10
-    listing.price_confidence = "unknown"
+    if listing.price_confidence != "user_verified":
+        listing.price_confidence = "unknown"
 
     miles = listing.mileage if listing.mileage is not None else 999999
     if miles < 15000:

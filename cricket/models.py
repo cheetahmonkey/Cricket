@@ -27,6 +27,7 @@ class Listing:
     cpo: Optional[bool] = None
     accident_history: str = "unknown"
     owners: Optional[int] = None
+    history_report_url: str = ""
     title_status: str = "unknown"
     service_records: str = ""
     rear_camera: str = "unknown"
@@ -34,6 +35,7 @@ class Listing:
     rear_cross_traffic_alert: str = "unknown"
     reverse_automatic_braking: str = "unknown"
     feature_confidence: str = "unknown"
+    safety_evidence: Dict[str, str] = field(default_factory=dict)
     listing_age_days: Optional[int] = None
     first_seen_date: Optional[str] = None
     last_seen_date: Optional[str] = None
