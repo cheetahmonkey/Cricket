@@ -104,6 +104,63 @@ def distance_summary(listing: Listing) -> str:
     return "%s mi" % listing.distance_miles if listing.distance_miles is not None else "Unknown"
 
 
+def item_value(item, key: str, default=""):
+    if isinstance(item, dict):
+        return item.get(key, default)
+    return getattr(item, key, default)
+
+
+def compact_listing_label(item) -> str:
+    year = item_value(item, "year") or "Unknown"
+    trim = item_value(item, "trim") or "Unknown"
+    mileage = miles(item_value(item, "mileage"))
+    price = money(item_value(item, "price"))
+    dealer = item_value(item, "dealer_name") or item_value(item, "source") or "Unknown seller"
+    label = "%s %s, %s mi, %s, %s" % (year, trim, mileage, price, compact_dealer_name_from_text(dealer))
+    url = item_value(item, "source_url") or item_value(item, "url")
+    return markdown_link(label, url) if url else label
+
+
+def compact_dealer_name_from_text(dealer: str) -> str:
+    dealer = dealer.replace("Carter Subaru Shoreline", "Carter Shoreline")
+    dealer = dealer.replace("Carter Subaru Ballard", "Carter Ballard")
+    return dealer
+
+
+def compact_inventory_changes(inventory_changes: Dict) -> List[str]:
+    if not inventory_changes or not inventory_changes.get("previous_date"):
+        return []
+
+    new_qualified = inventory_changes.get("new_qualified", [])
+    removed_qualified = inventory_changes.get("removed_qualified", [])
+    new_rejected = inventory_changes.get("new_rejected", [])
+    removed_rejected = inventory_changes.get("removed_rejected", [])
+
+    lines = [
+        "Inventory changes since %s: qualifying +%d/-%d; rejected/watchlist +%d/-%d."
+        % (
+            inventory_changes["previous_date"],
+            len(new_qualified),
+            len(removed_qualified),
+            len(new_rejected),
+            len(removed_rejected),
+        )
+    ]
+
+    details = []
+    if new_qualified:
+        details.append("New qualifying: %s" % "; ".join(compact_listing_label(item) for item in new_qualified[:3]))
+    if removed_qualified:
+        details.append("Removed qualifying: %s" % "; ".join(compact_listing_label(item) for item in removed_qualified[:3]))
+    if new_rejected:
+        details.append("New rejected/watchlist: %s" % "; ".join(compact_listing_label(item) for item in new_rejected[:3]))
+    if removed_rejected:
+        details.append("Removed rejected/watchlist: %s" % "; ".join(compact_listing_label(item) for item in removed_rejected[:3]))
+    if details:
+        lines.append(" ".join(details))
+    return lines
+
+
 def source_limitations(source_results: List[SourceResult]) -> List[str]:
     lines = []
     for result in source_results:
@@ -120,6 +177,7 @@ def generate_report(
     new_keys: List[str],
     removed_keys: List[str],
     price_changes: Dict[str, int],
+    inventory_changes: Dict = None,
 ) -> Path:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / ("%s_crosstrek_search_report.md" % date)
@@ -148,6 +206,10 @@ def generate_report(
             lines.append("Cricket found no qualifying listings today. Source access or sparse dealer markup may have limited the results, so this report should be treated as a conservative first pass.")
         lines.append("Cricket says: verify RAB before visiting when a candidate appears.")
     lines.append("")
+    inventory_lines = compact_inventory_changes(inventory_changes or {})
+    if inventory_lines:
+        lines.extend(inventory_lines)
+        lines.append("")
 
     limitations = source_limitations(source_results)
     if limitations:
@@ -211,7 +273,7 @@ def generate_report(
 
     lines.append("## New / Rejected / Price Drop Listings")
     lines.append("")
-    lines.append("New listings: %d" % len(new_keys))
+    lines.append("New qualifying listings: %d" % len(new_keys))
     for key in new_keys[:20]:
         lines.append("- %s" % key)
     lines.append("")

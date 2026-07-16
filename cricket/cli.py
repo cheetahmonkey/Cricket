@@ -7,7 +7,7 @@ from .models import Listing, RunResult
 from .report import generate_report
 from .scoring import apply_hard_filters, infer_features, score_listing
 from .sources import build_source
-from .storage import ensure_storage, save_history, save_normalized, save_raw
+from .storage import ensure_storage, inventory_changes_since_previous, save_history, save_normalized, save_raw
 from .sync import sync_run_outputs
 
 
@@ -69,10 +69,20 @@ def run_search(config_path=DEFAULT_CONFIG_PATH) -> RunResult:
             rejected.append(listing)
 
     qualified = sorted(qualified, key=lambda item: item.score, reverse=True)
+    inventory_changes = inventory_changes_since_previous(date, qualified, rejected)
     raw_path = save_raw(date, source_results)
     new_keys, removed_keys, price_changes = save_history(date, qualified, rejected)
     normalized_path = save_normalized(date, qualified, rejected)
-    report_path = generate_report(date, qualified, rejected, source_results, new_keys, removed_keys, price_changes)
+    report_path = generate_report(
+        date,
+        qualified,
+        rejected,
+        source_results,
+        new_keys,
+        removed_keys,
+        price_changes,
+        inventory_changes,
+    )
     sync_paths, sync_errors = sync_run_outputs(config, [report_path, raw_path, normalized_path])
 
     return RunResult(

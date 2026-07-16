@@ -54,12 +54,31 @@ class ReportTest(unittest.TestCase):
                     [],
                     [],
                     {},
+                    {
+                        "previous_date": "2026-07-10",
+                        "new_qualified": [qualified],
+                        "removed_qualified": [],
+                        "new_rejected": [rejected],
+                        "removed_rejected": [
+                            {
+                                "year": 2024,
+                                "trim": "Premium",
+                                "mileage": 28368,
+                                "price": 26080,
+                                "dealer_name": "Carter Subaru Shoreline",
+                                "source_url": "https://example.test/removed",
+                            }
+                        ],
+                    },
                 )
             finally:
                 report.REPORTS_DIR = original_reports_dir
 
             text = path.read_text(encoding="utf-8")
 
+        self.assertIn("Inventory changes since 2026-07-10: qualifying +1/-0; rejected/watchlist +1/-1.", text)
+        self.assertIn("New qualifying: [2025 Limited, 11,196 mi, $31,080, Carter Shoreline](https://example.test/good)", text)
+        self.assertIn("Removed rejected/watchlist: [2024 Premium, 28,368 mi, $26,080, Carter Shoreline](https://example.test/removed)", text)
         self.assertIn("| Rank | Score | Year | Trim | Safety | Feature Confidence | Miles | Price | Color | Seller | Distance |", text)
         self.assertIn(
             "| 1 | 73 | 2025 | Limited | RAB, BSD, RCTA | confirmed | 11,196 | $31,080 | [Magnetite Gray Metallic](https://example.test/good) | Carter Shoreline | Unknown |",
@@ -75,6 +94,7 @@ class ReportTest(unittest.TestCase):
             "| 1 | missing required safety evidence | 2025 | Premium | None confirmed | unknown | 7,845 | Unknown | [Unknown](https://example.test/reject) | Carter Shoreline | Unknown |",
             text,
         )
+        self.assertIn("New qualifying listings: 0", text)
 
 
 if __name__ == "__main__":

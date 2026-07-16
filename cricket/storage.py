@@ -75,6 +75,58 @@ def save_normalized(date: str, listings: List[Listing], rejected: List[Listing])
     return path
 
 
+def payload_key(payload: Dict) -> str:
+    listing_id = payload.get("listing_id")
+    if listing_id:
+        return "%s:%s" % (payload.get("source", ""), listing_id)
+    vin = payload.get("vin")
+    if vin:
+        return "vin:%s" % str(vin).upper()
+    return "%s:%s:%s:%s:%s" % (
+        payload.get("source_url", ""),
+        payload.get("year") or "",
+        payload.get("mileage") or "",
+        payload.get("price") or "",
+        payload.get("dealer_name", ""),
+    )
+
+
+def listing_inventory_key(listing: Listing) -> str:
+    if listing.listing_id:
+        return "%s:%s" % (listing.source, listing.listing_id)
+    return listing.key()
+
+
+def previous_normalized_snapshot(date: str) -> Tuple[str, Dict[str, Dict[str, Dict]]]:
+    ensure_storage()
+    candidates = sorted(path for path in NORMALIZED_DIR.glob("*.json") if path.stem < date)
+    if not candidates:
+        return "", {"qualified": {}, "rejected": {}}
+
+    path = candidates[-1]
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return path.stem, {
+        "qualified": {payload_key(item): item for item in payload.get("qualified", [])},
+        "rejected": {payload_key(item): item for item in payload.get("rejected", [])},
+    }
+
+
+def inventory_changes_since_previous(date: str, qualified: List[Listing], rejected: List[Listing]) -> Dict:
+    previous_date, previous = previous_normalized_snapshot(date)
+    current_qualified = {listing_inventory_key(listing): listing for listing in qualified}
+    current_rejected = {listing_inventory_key(listing): listing for listing in rejected}
+    previous_qualified = previous["qualified"]
+    previous_rejected = previous["rejected"]
+
+    return {
+        "previous_date": previous_date,
+        "new_qualified": [current_qualified[key] for key in sorted(set(current_qualified) - set(previous_qualified))],
+        "removed_qualified": [previous_qualified[key] for key in sorted(set(previous_qualified) - set(current_qualified))],
+        "new_rejected": [current_rejected[key] for key in sorted(set(current_rejected) - set(previous_rejected))],
+        "removed_rejected": [previous_rejected[key] for key in sorted(set(previous_rejected) - set(current_rejected))],
+    }
+
+
 def load_previous_state() -> Dict[str, Dict]:
     ensure_storage()
     with sqlite3.connect(DB_PATH) as conn:
