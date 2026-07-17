@@ -9,6 +9,12 @@ data_store:
   windows_root: "/mnt/c/MMM/data/Mom/Cricket"
   sync_on_report: true
 
+publishing:
+  google_drive:
+    remote: "transfer"
+    folder_id: "1Ay-sA8xVJTiWH65BvuP321KvfFPW-9Oy"
+    chrome_path: "/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe"
+
 vehicle:
   make: "Subaru"
   model: "Crosstrek"

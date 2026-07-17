@@ -14,7 +14,7 @@ Generated reports and snapshots are runtime data. Cricket syncs them to the Wind
 /mnt/c/MMM/data/Mom/Cricket
 ```
 
-The scheduled daily runner generates the daily report, refreshes `docs/index.html`, and pushes the changed page to GitHub Pages:
+The scheduled daily runner generates the daily report, refreshes `docs/index.html`, pushes the changed page to GitHub Pages, and uploads a PDF named `YYYY-MM-DD cricket report.pdf` to the configured family Google Drive folder:
 
 ```bash
 /bin/bash /home/mmm/code/Mom/Subaru/scripts/run_daily_cricket.sh

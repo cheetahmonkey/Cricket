@@ -18,4 +18,6 @@ else
   echo "Cricket report page already matches the latest report."
 fi
 
+python3 scripts/publish_drive_report.py "$latest_report"
+
 echo "=== [$(date '+%Y-%m-%d %H:%M:%S %Z %z')] Cricket daily search finished ==="

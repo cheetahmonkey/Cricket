@@ -134,6 +134,23 @@ def document(title: str, body: str) -> str:
     th { background: #edf5f0; color: #183a2d; font-weight: 700; white-space: nowrap; }
     tbody tr:nth-child(even) { background: #fafcfc; }
     tbody tr:last-child td { border-bottom: 0; }
+    @page { size: letter; margin: .45in; }
+    @media print {
+      body { background: white; font-size: 9pt; }
+      header { background: white; color: var(--ink); border-bottom: 2px solid #75b798; }
+      .masthead, main { width: 100%%; margin: 0; }
+      .masthead { padding: 0 0 10px; }
+      .tagline { color: var(--muted); }
+      main { border: 0; box-shadow: none; padding: 14px 0 0; }
+      h1 { font-size: 20pt; margin-bottom: 14px; }
+      h2 { margin-top: 24px; font-size: 14pt; break-after: avoid; }
+      h3 { margin-top: 20px; font-size: 11pt; break-after: avoid; }
+      .table-wrap { overflow: visible; margin: 8px 0 14px; }
+      table { min-width: 0; font-size: 6.8pt; }
+      th, td { padding: 4px; }
+      tr, img { break-inside: avoid; }
+      a { color: var(--ink); text-decoration: none; }
+    }
     @media (max-width: 640px) { .masthead, main { width: min(100%% - 22px, 1120px); } .masthead { display: block; padding: 16px 0; } .tagline { margin-top: 3px; } main { margin-top: 12px; padding: 20px 14px; } h2 { margin-top: 30px; } }
   </style>
 </head>
