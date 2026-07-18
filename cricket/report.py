@@ -275,14 +275,15 @@ def generate_report(
 
     lines.append("## Top Opportunities")
     if top:
-        lines.append("| Rank | Score | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Color | Seller | Check Before Visiting |")
-        lines.append("| ---: | ----: | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ----- | ------ | --------------------- |")
+        lines.append("| Rank | Score | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting |")
+        lines.append("| ---: | ----: | ----- | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ------ | --------------------- |")
         for index, listing in enumerate(top, start=1):
             lines.append(
                 "| %d | %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
                 % (
                     index,
                     listing.score,
+                    table_cell(linked_color(listing)),
                     listing.year or "Unknown",
                     table_cell(listing.trim or "Unknown"),
                     table_cell(rear_package_safety(listing)),
@@ -290,7 +291,6 @@ def generate_report(
                     miles(listing.mileage),
                     money(listing.price),
                     money(estimated_out_the_door(listing, pricing)),
-                    table_cell(linked_color(listing)),
                     table_cell(compact_dealer_name(listing)),
                     table_cell(visit_check(listing)),
                 )
@@ -332,14 +332,15 @@ def generate_report(
     lines.append("Cricket is keeping %d listing%s visible for comparison, even though each has a concern noted below." % (len(rejected), "" if len(rejected) == 1 else "s"))
     if rejected:
         lines.append("")
-        lines.append("| # | Main Concern | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Color | Seller | Check Before Visiting |")
-        lines.append("| ---: | ------------ | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ----- | ------ | --------------------- |")
+        lines.append("| # | Main Concern | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting |")
+        lines.append("| ---: | ------------ | ----- | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ------ | --------------------- |")
         for index, listing in enumerate(rejected[:30], start=1):
             lines.append(
                 "| %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
                 % (
                     index,
                     table_cell(listing.reject_reason or "rejected"),
+                    table_cell(linked_color(listing)),
                     listing.year or "Unknown",
                     table_cell(listing.trim or "Unknown"),
                     table_cell(rear_package_safety(listing)),
@@ -347,7 +348,6 @@ def generate_report(
                     miles(listing.mileage),
                     money(listing.price),
                     money(estimated_out_the_door(listing, pricing)),
-                    table_cell(linked_color(listing)),
                     table_cell(compact_dealer_name(listing)),
                     table_cell(visit_check(listing)),
                 )
