@@ -82,6 +82,7 @@ def run_search(config_path=DEFAULT_CONFIG_PATH) -> RunResult:
         removed_keys,
         price_changes,
         inventory_changes,
+        config.get("pricing", {}),
     )
     sync_paths, sync_errors = sync_run_outputs(config, [report_path, raw_path, normalized_path])
 

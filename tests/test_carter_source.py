@@ -104,6 +104,18 @@ class CarterSourceTest(unittest.TestCase):
         self.assertEqual(parsed["price"], 31311)
         self.assertEqual(parsed["mileage"], 4575)
 
+    def test_parse_detail_text_ignores_non_numeric_mileage_value(self):
+        text = """
+        # Used 2024 Subaru Crosstrek Premium in Seattle, WA
+        Mileage
+        Trim
+        Premium
+        Carter Price $27,186
+        """
+        parsed = parse_carter_detail_text(text)
+        self.assertEqual(parsed["price"], 27186)
+        self.assertNotIn("mileage", parsed)
+
     def test_search_tries_direct_detail_when_text_mirror_has_no_price(self):
         sitemap = """<?xml version="1.0"?>
         <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

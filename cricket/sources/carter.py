@@ -147,7 +147,12 @@ def parse_carter_detail_text(text: str) -> Dict:
     for label, key in field_map.items():
         value = value_after_label(non_empty, label)
         if value:
-            parsed[key] = int(value.replace(",", "")) if key == "mileage" else value
+            if key == "mileage":
+                mileage = parse_mileage(value)
+                if mileage is not None:
+                    parsed[key] = mileage
+            else:
+                parsed[key] = value
 
     if any("subaru certified pre-owned" in line.lower() for line in non_empty):
         parsed["cpo"] = True
@@ -225,6 +230,14 @@ def price_from_text(value: str):
     if not match:
         return None
     return int(match.group(1).replace(",", ""))
+
+
+def parse_mileage(value: str):
+    """Return a mileage only when the dealer's value is a numeric field."""
+    compact = value.replace(",", "").strip()
+    if not compact.isdigit():
+        return None
+    return int(compact)
 
 
 def value_after_label(lines: List[str], label: str):

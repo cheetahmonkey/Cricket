@@ -27,6 +27,27 @@ def report_action(listing: Listing) -> str:
     return "Needs safety-feature verification"
 
 
+def visit_check(listing: Listing) -> str:
+    checks = []
+    if listing.feature_confidence != "confirmed":
+        checks.append("Verify RAB")
+    if listing.history_report_url:
+        checks.append(markdown_link("Open CARFAX", listing.history_report_url))
+    else:
+        checks.append("Review history")
+    checks.append("Final OTD")
+    return " + ".join(checks)
+
+
+def estimated_out_the_door(listing: Listing, pricing: Dict) -> int:
+    if listing.price is None:
+        return None
+    sales_tax_rate = pricing.get("sales_tax_rate", 0.11)
+    doc_fee = pricing.get("dealer_doc_fee", 200)
+    registration = pricing.get("wa_registration_estimate", 700)
+    return int(round(listing.price * (1 + sales_tax_rate) + doc_fee + registration))
+
+
 def why_listing(listing: Listing) -> List[str]:
     reasons = []
     if listing.trim.lower() == "limited":
@@ -47,7 +68,7 @@ def why_listing(listing: Listing) -> List[str]:
 
 
 def open_questions(listing: Listing) -> List[str]:
-    questions = ["Confirm clean title / accident history", "Ask for out-the-door price"]
+    questions = ["Review the linked CARFAX report", "Ask for final out-the-door price"]
     if listing.feature_confidence != "confirmed":
         questions.insert(0, "Confirm Reverse Automatic Braking")
     return questions
@@ -136,29 +157,67 @@ def compact_inventory_changes(inventory_changes: Dict) -> List[str]:
     new_rejected = inventory_changes.get("new_rejected", [])
     removed_rejected = inventory_changes.get("removed_rejected", [])
 
-    lines = [
-        "Inventory changes since %s: qualifying +%d/-%d; rejected/watchlist +%d/-%d."
-        % (
-            inventory_changes["previous_date"],
-            len(new_qualified),
-            len(removed_qualified),
-            len(new_rejected),
-            len(removed_rejected),
+    lines = []
+    if new_qualified or removed_qualified:
+        lines.append(
+            "Top opportunities since %s: +%d new, -%d removed."
+            % (inventory_changes["previous_date"], len(new_qualified), len(removed_qualified))
         )
-    ]
+    else:
+        lines.append("Top opportunities: no additions or removals since %s." % inventory_changes["previous_date"])
+    if new_rejected or removed_rejected:
+        lines.append("Watchlist changes: +%d added, -%d removed." % (len(new_rejected), len(removed_rejected)))
 
     details = []
     if new_qualified:
-        details.append("New qualifying: %s" % "; ".join(compact_listing_label(item) for item in new_qualified[:3]))
+        details.append("- New top opportunity: %s" % "; ".join(compact_listing_label(item) for item in new_qualified[:3]))
     if removed_qualified:
-        details.append("Removed qualifying: %s" % "; ".join(compact_listing_label(item) for item in removed_qualified[:3]))
+        details.append("- Removed top opportunity: %s" % "; ".join(compact_listing_label(item) for item in removed_qualified[:3]))
     if new_rejected:
-        details.append("New rejected/watchlist: %s" % "; ".join(compact_listing_label(item) for item in new_rejected[:3]))
+        details.append("- New watchlist: %s" % "; ".join(compact_listing_label(item) for item in new_rejected[:3]))
     if removed_rejected:
-        details.append("Removed rejected/watchlist: %s" % "; ".join(compact_listing_label(item) for item in removed_rejected[:3]))
+        details.append("- Removed watchlist: %s" % "; ".join(compact_listing_label(item) for item in removed_rejected[:3]))
     if details:
-        lines.append(" ".join(details))
+        lines.extend(details)
     return lines
+
+
+def morning_note(top: List[Listing], inventory_changes: Dict, price_changes: Dict[str, int], pricing: Dict) -> List[str]:
+    """Return a short decision-relevant note, or nothing when there is no news."""
+    if not top:
+        return ["No qualifying Crosstreks are on Cricket's current shortlist."]
+
+    changes = inventory_changes or {}
+    new_top = changes.get("new_qualified", [])
+    removed_top = changes.get("removed_qualified", [])
+    new_watchlist = changes.get("new_rejected", [])
+    removed_watchlist = changes.get("removed_rejected", [])
+    notes = []
+    if new_top or removed_top:
+        notes.append(
+            "Top opportunities changed: %d added and %d removed." % (len(new_top), len(removed_top))
+        )
+
+    drops = {key: change for key, change in price_changes.items() if change < 0}
+    if drops:
+        dropped_listings = [listing for listing in top if listing.key() in drops]
+        if dropped_listings:
+            listing = dropped_listings[0]
+            notes.append(
+                "%s at %s dropped %s; its estimated out-the-door cost is now %s."
+                % (
+                    markdown_link("%s %s" % (listing.year or "Unknown", listing.trim or "Crosstrek"), listing.source_url),
+                    compact_dealer_name(listing),
+                    money(abs(drops[listing.key()])),
+                    money(estimated_out_the_door(listing, pricing)),
+                )
+            )
+        else:
+            notes.append("%d listing%s had a price drop." % (len(drops), "" if len(drops) == 1 else "s"))
+
+    if new_watchlist or removed_watchlist:
+        notes.append("Watchlist: %d added and %d removed." % (len(new_watchlist), len(removed_watchlist)))
+    return notes
 
 
 def source_limitations(source_results: List[SourceResult]) -> List[str]:
@@ -178,25 +237,24 @@ def generate_report(
     removed_keys: List[str],
     price_changes: Dict[str, int],
     inventory_changes: Dict = None,
+    pricing: Dict = None,
 ) -> Path:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / ("%s_crosstrek_search_report.md" % date)
     top = sorted(listings, key=lambda item: item.score, reverse=True)
+    pricing = pricing or {}
     lines: List[str] = []
     lines.append("# %s Crosstrek Search Report" % date)
     lines.append("")
-    lines.append("## Summary")
     sitemap_candidates = [
         item for item in rejected if item.raw.get("source_kind") == "dealer_eprocess_inventory_sitemap"
     ]
-    if top:
-        carter_count = len([item for item in top if "carter" in item.dealer_name.lower()])
-        lines.append(
-            "Cricket found %d promising Crosstrek%s today. %s"
-            % (len(top), "" if len(top) == 1 else "s", "Cricket found %d Carter listing%s worth verifying." % (carter_count, "" if carter_count == 1 else "s") if carter_count else "No Carter listing qualified from available source data.")
-        )
-        lines.append("Cricket says: verify RAB before visiting unless the listing explicitly confirms Reverse Automatic Braking.")
-    else:
+    note_lines = morning_note(top, inventory_changes or {}, price_changes, pricing)
+    if note_lines:
+        lines.append("## Cricket's Morning Note")
+        lines.extend(note_lines)
+        lines.append("")
+    if not top:
         if sitemap_candidates:
             lines.append(
                 "Cricket found no qualifying listings today, but did find %d Carter sitemap candidate%s that need mileage, price, and safety-feature verification."
@@ -204,26 +262,24 @@ def generate_report(
             )
         else:
             lines.append("Cricket found no qualifying listings today. Source access or sparse dealer markup may have limited the results, so this report should be treated as a conservative first pass.")
-        lines.append("Cricket says: verify RAB before visiting when a candidate appears.")
-    lines.append("")
+        lines.append("Cricket says: a good listing still needs clear RAB evidence before it becomes a real candidate.")
+        lines.append("")
     inventory_lines = compact_inventory_changes(inventory_changes or {})
     if inventory_lines:
+        lines.append("## What Changed Since Yesterday")
         lines.extend(inventory_lines)
-        lines.append("")
-
-    limitations = source_limitations(source_results)
-    if limitations:
-        lines.append("### Source Access Notes")
-        lines.extend(limitations)
+        drops = {key: change for key, change in price_changes.items() if change < 0}
+        if drops:
+            lines.append("Price drops: %d." % len(drops))
         lines.append("")
 
     lines.append("## Top Opportunities")
     if top:
-        lines.append("| Rank | Score | Year | Trim | Safety | Feature Confidence | Miles | Price | Color | Seller | Distance |")
-        lines.append("| ---: | ----: | ---- | ---- | ------ | ------------------ | ----: | ----: | ----- | ------ | -------: |")
+        lines.append("| Rank | Score | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Color | Seller | Check Before Visiting |")
+        lines.append("| ---: | ----: | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ----- | ------ | --------------------- |")
         for index, listing in enumerate(top, start=1):
             lines.append(
-                "| %d | %d | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                "| %d | %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
                 % (
                     index,
                     listing.score,
@@ -233,9 +289,10 @@ def generate_report(
                     table_cell(listing.feature_confidence),
                     miles(listing.mileage),
                     money(listing.price),
+                    money(estimated_out_the_door(listing, pricing)),
                     table_cell(linked_color(listing)),
                     table_cell(compact_dealer_name(listing)),
-                    distance_summary(listing),
+                    table_cell(visit_check(listing)),
                 )
             )
         lines.append("")
@@ -247,13 +304,12 @@ def generate_report(
             lines.append("")
             lines.append("Score: %d/100  " % listing.score)
             lines.append("Seller: %s  " % (listing.dealer_name or listing.source))
-            lines.append("Distance: %s  " % ("%s miles" % listing.distance_miles if listing.distance_miles is not None else "Unknown"))
+            lines.append("Estimated out the door: %s  " % money(estimated_out_the_door(listing, pricing)))
             lines.append("Color: %s - %s color tier  " % (listing.exterior_color or "Unknown", listing.color_score))
             lines.append("URL: %s  " % (listing.source_url or "Unknown"))
             lines.append("VIN: %s  " % (listing.vin or "Unknown"))
-            lines.append("Vehicle history: %s  " % vehicle_history_summary(listing))
             if listing.history_report_url:
-                lines.append("History report: %s  " % listing.history_report_url)
+                lines.append("CARFAX report: %s  " % listing.history_report_url)
             lines.append("Feature confidence: %s - %s  " % (listing.feature_confidence.title(), report_action(listing)))
             safety_evidence = safety_evidence_summary(listing)
             if safety_evidence:
@@ -271,25 +327,16 @@ def generate_report(
         lines.append("No listings qualified for the main ranked list.")
         lines.append("")
 
-    lines.append("## New / Rejected / Price Drop Listings")
+    lines.append("## Other Listings to Keep in View")
     lines.append("")
-    lines.append("New qualifying listings: %d" % len(new_keys))
-    for key in new_keys[:20]:
-        lines.append("- %s" % key)
-    lines.append("")
-    drops = {key: change for key, change in price_changes.items() if change < 0}
-    lines.append("Price drops: %d" % len(drops))
-    for key, change in drops.items():
-        lines.append("- %s: %s" % (key, money(change)))
-    lines.append("")
-    lines.append("Rejected listings: %d" % len(rejected))
+    lines.append("Cricket is keeping %d listing%s visible for comparison, even though each has a concern noted below." % (len(rejected), "" if len(rejected) == 1 else "s"))
     if rejected:
         lines.append("")
-        lines.append("| # | Reason | Year | Trim | Safety | Feature Confidence | Miles | Price | Color | Seller | Distance |")
-        lines.append("| ---: | ------ | ---- | ---- | ------ | ------------------ | ----: | ----: | ----- | ------ | -------: |")
+        lines.append("| # | Main Concern | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Color | Seller | Check Before Visiting |")
+        lines.append("| ---: | ------------ | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ----- | ------ | --------------------- |")
         for index, listing in enumerate(rejected[:30], start=1):
             lines.append(
-                "| %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                "| %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
                 % (
                     index,
                     table_cell(listing.reject_reason or "rejected"),
@@ -299,17 +346,22 @@ def generate_report(
                     table_cell(listing.feature_confidence),
                     miles(listing.mileage),
                     money(listing.price),
+                    money(estimated_out_the_door(listing, pricing)),
                     table_cell(linked_color(listing)),
                     table_cell(compact_dealer_name(listing)),
-                    distance_summary(listing),
+                    table_cell(visit_check(listing)),
                 )
             )
-    if removed_keys:
-        lines.append("")
-        lines.append("Removed since prior history: %d" % len(removed_keys))
-        for key in removed_keys[:20]:
-            lines.append("- %s" % key)
     lines.append("")
+
+    lines.append("## Report Details")
+    lines.append("Estimated OTD = listed price + 11%% estimated Washington sales tax + $%s Carter document fee + $%s estimated Washington registration/licensing. Confirm the dealer's final out-the-door number before purchase." % (format(pricing.get("dealer_doc_fee", 200), ","), format(pricing.get("wa_registration_estimate", 700), ",")))
+    lines.append("")
+    limitations = source_limitations(source_results)
+    if limitations:
+        lines.append("### Search Notes")
+        lines.extend(limitations)
+        lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")
     return path

@@ -19,6 +19,7 @@ class ReportTest(unittest.TestCase):
             exterior_color="Magnetite Gray Metallic",
             dealer_name="Carter Subaru Shoreline",
             source_url="https://example.test/good",
+            history_report_url="https://example.test/carfax",
             reverse_automatic_braking="yes",
             blind_spot_detection="yes",
             rear_cross_traffic_alert="yes",
@@ -76,25 +77,33 @@ class ReportTest(unittest.TestCase):
 
             text = path.read_text(encoding="utf-8")
 
-        self.assertIn("Inventory changes since 2026-07-10: qualifying +1/-0; rejected/watchlist +1/-1.", text)
-        self.assertIn("New qualifying: [2025 Limited, 11,196 mi, $31,080, Carter Shoreline](https://example.test/good)", text)
-        self.assertIn("Removed rejected/watchlist: [2024 Premium, 28,368 mi, $26,080, Carter Shoreline](https://example.test/removed)", text)
-        self.assertIn("| Rank | Score | Year | Trim | Safety | Feature Confidence | Miles | Price | Color | Seller | Distance |", text)
+        self.assertIn("Top opportunities since 2026-07-10: +1 new, -0 removed.", text)
+        self.assertIn("Watchlist changes: +1 added, -1 removed.", text)
+        self.assertIn("New top opportunity: [2025 Limited, 11,196 mi, $31,080, Carter Shoreline](https://example.test/good)", text)
+        self.assertIn("Removed watchlist: [2024 Premium, 28,368 mi, $26,080, Carter Shoreline](https://example.test/removed)", text)
+        self.assertIn("## Cricket's Morning Note", text)
+        self.assertIn("Top opportunities changed: 1 added and 0 removed.", text)
+        self.assertIn("| Rank | Score | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Color | Seller | Check Before Visiting |", text)
         self.assertIn(
-            "| 1 | 73 | 2025 | Limited | RAB, BSD, RCTA | confirmed | 11,196 | $31,080 | [Magnetite Gray Metallic](https://example.test/good) | Carter Shoreline | Unknown |",
+            "| 1 | 73 | 2025 | Limited | RAB, BSD, RCTA | confirmed | 11,196 | $31,080 | $35,399 | [Magnetite Gray Metallic](https://example.test/good) | Carter Shoreline | [Open CARFAX](https://example.test/carfax) + Final OTD |",
             text,
         )
         self.assertIn(
             "Safety evidence: RAB: Automatic emergency braking (rear); BSD: Blind spot safety (sensor/alert); RCTA: Cross traffic alert (rear)",
             text,
         )
-        self.assertIn("Rejected listings: 1\n\n| # | Reason | Year | Trim | Safety | Feature Confidence | Miles | Price | Color | Seller | Distance |", text)
-        self.assertIn("| ---: | ------ | ---- | ---- | ------ | ------------------ | ----: | ----: | ----- | ------ | -------: |", text)
+        self.assertIn("CARFAX report: https://example.test/carfax", text)
+        self.assertNotIn("Vehicle history:", text)
+        self.assertIn("Cricket is keeping 1 listing visible for comparison", text)
+        self.assertIn("| # | Main Concern | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Color | Seller | Check Before Visiting |", text)
+        self.assertIn("| ---: | ------------ | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ----- | ------ | --------------------- |", text)
         self.assertIn(
-            "| 1 | missing required safety evidence | 2025 | Premium | None confirmed | unknown | 7,845 | Unknown | [Unknown](https://example.test/reject) | Carter Shoreline | Unknown |",
+            "| 1 | missing required safety evidence | 2025 | Premium | None confirmed | unknown | 7,845 | Unknown | Unknown | [Unknown](https://example.test/reject) | Carter Shoreline | Verify RAB + Review history + Final OTD |",
             text,
         )
-        self.assertIn("New qualifying listings: 0", text)
+        self.assertIn("Estimated OTD = listed price + 11% estimated Washington sales tax + $200 Carter document fee + $700 estimated Washington registration/licensing.", text)
+        note = report.morning_note([qualified], {}, {qualified.key(): -223}, {})
+        self.assertIn("[2025 Limited](https://example.test/good)", note[0])
 
 
 if __name__ == "__main__":
