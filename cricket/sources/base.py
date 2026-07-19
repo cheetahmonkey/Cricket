@@ -1,4 +1,5 @@
 import time
+import subprocess
 import urllib.error
 import urllib.request
 from typing import Dict, List
@@ -36,6 +37,18 @@ class SourceAdapter:
         }
 
     def fetch(self, url: str) -> str:
+        if self.config.get("fetch_via_curl"):
+            try:
+                completed = subprocess.run(
+                    ["curl", "-Ls", url],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=30,
+                )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                raise OSError("curl fetch failed for %s: %s" % (url, exc))
+            return completed.stdout.decode("utf-8", errors="replace")
         request = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
         with urllib.request.urlopen(request, timeout=20) as response:
             return response.read().decode("utf-8", errors="replace")

@@ -34,11 +34,14 @@ class CarterSource(SourceAdapter):
                         enriched_count += 1
                     unique_items.append(enriched)
                 result.raw_items.extend(unique_items)
-                result.listings.extend(normalize_items(unique_items, self.source_defaults(sitemap_url)))
+                normalized_items = unique_items
+                if self.config.get("normalize_only_enriched"):
+                    normalized_items = [item for item in unique_items if item.get("detail_text_fetched")]
+                result.listings.extend(normalize_items(normalized_items, self.source_defaults(sitemap_url)))
             except (ET.ParseError, OSError) as exc:
                 result.errors.append("%s: %s" % (sitemap_url, exc))
 
-        if not result.raw_items:
+        if not result.raw_items and (self.config.get("urls") or self.config.get("url")):
             fallback = super().search()
             result.errors.extend(fallback.errors)
             result.raw_items.extend(fallback.raw_items)
@@ -78,10 +81,14 @@ class CarterSource(SourceAdapter):
         return raw
 
     def parse_sitemap(self, xml_text: str, sitemap_url: str) -> List[Dict]:
-        root = ET.fromstring(xml_text)
+        if "<urlset" in xml_text or "<sitemapindex" in xml_text:
+            root = ET.fromstring(xml_text)
+            candidate_urls = [(loc.text or "").strip() for loc in root.findall(".//{*}loc")]
+        else:
+            # The text mirror renders public sitemaps as Markdown links.
+            candidate_urls = re.findall(r"\]\((https?://[^)]+)\)", xml_text)
         urls: List[Dict] = []
-        for loc in root.findall(".//{*}loc"):
-            url = (loc.text or "").strip()
+        for url in candidate_urls:
             lower = url.lower()
             if "/auto/used-" not in lower:
                 continue
@@ -113,14 +120,84 @@ class CarterSource(SourceAdapter):
         return raw
 
 
-class LocalSubaruSource(SourceAdapter):
-    pass
+class LocalSubaruSource(CarterSource):
+    """Read standard dealer eProcess inventory sitemaps conservatively.
+
+    These dealers publish individual inventory URLs in their sitemaps, but use a
+    different URL layout than Carter.  Detail enrichment is intentionally capped
+    in configuration so the daily search is not a page crawl.
+    """
+
+    def parse_sitemap(self, xml_text: str, sitemap_url: str) -> List[Dict]:
+        if "<urlset" in xml_text or "<sitemapindex" in xml_text:
+            root = ET.fromstring(xml_text)
+            candidate_urls = [(loc.text or "").strip() for loc in root.findall(".//{*}loc")]
+        else:
+            # The text mirror renders public sitemaps as Markdown links.
+            candidate_urls = re.findall(r"\]\((https?://[^)]+)\)", xml_text)
+        urls: List[Dict] = []
+        for url in candidate_urls:
+            lower = url.lower()
+            if "subaru-crosstrek" not in lower:
+                continue
+            if not re.search(r"/(used|certified)/subaru/", lower):
+                continue
+            raw = self.raw_from_vehicle_url(url)
+            raw["sitemap_url"] = sitemap_url
+            urls.append(raw)
+        return urls
+
+    def raw_from_vehicle_url(self, url: str) -> Dict:
+        match = re.search(
+            r"/(used|certified)/subaru/(\d{4})-subaru-crosstrek-for-sale-[^/]*-([a-f0-9]{16,})\.htm$",
+            url,
+            re.I,
+        )
+        raw: Dict = {
+            "url": url,
+            "title": url.rstrip("/").split("/")[-1].replace(".htm", "").replace("-", " "),
+            "description": "Dealer-advertised inventory sitemap candidate. Detail page is needed for price, mileage, color, and safety-feature evidence.",
+            "source_kind": "dealer_standard_inventory_sitemap",
+        }
+        if match:
+            raw["condition"] = match.group(1)
+            raw["year"] = int(match.group(2))
+            raw["make"] = "Subaru"
+            raw["model"] = "Crosstrek"
+            raw["listing_id"] = match.group(3)
+            raw["cpo"] = match.group(1).lower() == "certified"
+        return raw
+
+    def enrich_from_detail_text(self, raw: Dict, enriched_count: int = 0) -> Dict:
+        minimum_year = self.config.get("minimum_detail_year")
+        if isinstance(minimum_year, int) and isinstance(raw.get("year"), int) and raw["year"] < minimum_year:
+            return raw
+        return super().enrich_from_detail_text(raw, enriched_count)
 
 
 def parse_carter_detail_text(text: str) -> Dict:
     lines = [unescape(line).strip() for line in text.splitlines()]
+    if "<html" in text.lower():
+        # A few standard dealer pages expose their vehicle overview only in
+        # server-rendered HTML and embedded JSON rather than visible text.
+        lines.append(unescape(re.sub(r"<[^>]+>", " ", text)).strip())
     non_empty = [line for line in lines if line]
     parsed: Dict = {}
+
+    html_title = re.search(r"<title[^>]*>\s*(.*?)\s*</title>", text, re.I | re.S)
+    if html_title:
+        title_text = unescape(re.sub(r"<[^>]+>", " ", html_title.group(1))).strip()
+        title_match = re.search(
+            r"(?:Used|Certified(?: Pre-Owned)?)\s+(\d{4})\s+Subaru\s+Crosstrek\s+(.+?)\s+(?:in|for)\b",
+            title_text,
+            re.I,
+        )
+        if title_match:
+            parsed["year"] = int(title_match.group(1))
+            parsed["make"] = "Subaru"
+            parsed["model"] = "Crosstrek"
+            parsed["trim"] = clean_trim(title_match.group(2))
+            parsed["cpo"] = "certified" in title_text.lower()
 
     title = first_match(non_empty, r"^#\s*(Certified|Used|Used Certified).*?(\d{4})\s+Subaru\s+Crosstrek\s+(.+?)\s+(near|in)\b")
     if title:
@@ -129,6 +206,13 @@ def parse_carter_detail_text(text: str) -> Dict:
         parsed["model"] = "Crosstrek"
         parsed["trim"] = clean_trim(title.group(3))
         parsed["cpo"] = "certified" in title.group(1).lower()
+
+    standard_title = first_match(non_empty, r"^#{0,2}\s*(\d{4})\s+Subaru\s+Crosstrek\s+(.+?)\s*$")
+    if standard_title:
+        parsed.setdefault("year", int(standard_title.group(1)))
+        parsed.setdefault("make", "Subaru")
+        parsed.setdefault("model", "Crosstrek")
+        parsed.setdefault("trim", clean_trim(standard_title.group(2)))
 
     price = parse_price(non_empty, text)
     if price is not None:
@@ -154,7 +238,33 @@ def parse_carter_detail_text(text: str) -> Dict:
             else:
                 parsed[key] = value
 
-    if any("subaru certified pre-owned" in line.lower() for line in non_empty):
+    # Standard eProcess dealer detail pages expose the overview in compact
+    # prose rather than Carter's label/value lines.
+    detail_text = " ".join(non_empty)
+    standard_price = parse_standard_dealer_price(detail_text)
+    if price is None and standard_price is not None:
+        parsed["price"] = standard_price
+    standard_mileage = re.search(r"\bOdometer\s+([\d,]+)\s+miles?\b", detail_text, re.I)
+    if "mileage" not in parsed and standard_mileage:
+        parsed["mileage"] = int(standard_mileage.group(1).replace(",", ""))
+    standard_color = re.search(r"\bExterior Color\s+(.+?)\s+Interior Color\b", detail_text, re.I)
+    if "exterior_color" not in parsed and standard_color:
+        parsed["exterior_color"] = standard_color.group(1).strip()
+    standard_interior = re.search(r"\bInterior Color\s+(.+?)\s+Odometer\b", detail_text, re.I)
+    if "interior_color" not in parsed and standard_interior:
+        parsed["interior_color"] = standard_interior.group(1).strip()
+    standard_overview = re.search(
+        r"\bTransmission\s+(.+?)\s+Drivetrain\s+(.+?)\s+Engine\s+(.+?)\s+VIN\s+([A-HJ-NPR-Z0-9]{17})\s+Stock Number\s+(\S+)",
+        detail_text,
+        re.I,
+    )
+    if standard_overview:
+        parsed.setdefault("transmission", standard_overview.group(1).strip())
+        parsed.setdefault("drivetrain", standard_overview.group(2).strip())
+        parsed.setdefault("vin", standard_overview.group(4).upper())
+        parsed.setdefault("stock_number", standard_overview.group(5).strip())
+
+    if any("subaru certified" in line.lower() for line in non_empty):
         parsed["cpo"] = True
     if any("one-owner" in line.lower() or "1-owner" in line.lower() for line in non_empty):
         parsed["owners"] = 1
@@ -165,7 +275,7 @@ def parse_carter_detail_text(text: str) -> Dict:
     rab_line = first_line_containing(non_empty, ["automatic emergency braking (rear)"])
     bsd_line = first_line_containing(non_empty, ["blind spot"])
     rcta_line = first_line_containing(non_empty, ["cross traffic alert (rear)"]) or first_line_containing(non_empty, ["rear cross-traffic alert"])
-    rear_camera_line = first_line_containing(non_empty, ["camera system (rearview)"]) or first_line_containing(non_empty, ["reverse camera"])
+    rear_camera_line = first_line_containing(non_empty, ["camera system (rearview)"]) or first_line_containing(non_empty, ["reverse camera"]) or first_line_containing(non_empty, ["parking camera rear"])
 
     if rab_line:
         parsed["reverse_automatic_braking"] = "yes"
@@ -222,6 +332,20 @@ def parse_price(lines: List[str], full_text: str = ""):
                 parsed = price_from_text(candidate)
                 if parsed is not None:
                     return parsed
+    return None
+
+
+def parse_standard_dealer_price(text: str):
+    """Use the advertised asking price before dealer documentation fees."""
+    match = re.search(r"\$\s*([\d,]{5,})\s+Asking Price\b", text, re.I)
+    if match:
+        return int(match.group(1).replace(",", ""))
+    match = re.search(r"\bAsking Price\s*\$?\s*([\d,]{5,})", text, re.I)
+    if match:
+        return int(match.group(1).replace(",", ""))
+    match = re.search(r'"internetPrice"\s*:\s*"?([\d,]{5,})', text, re.I)
+    if match:
+        return int(match.group(1).replace(",", ""))
     return None
 
 

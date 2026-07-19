@@ -105,17 +105,32 @@ sources:
       location: "Washington"
       distance_miles:
       url: "https://www.subaru.com/vehicles/certified-pre-owned.html"
-    - name: "Local Subaru dealership websites"
+    - name: "Renton Subaru used inventory"
       adapter: "local_subaru"
-      dealer_name: "Local Subaru dealers"
+      dealer_name: "Renton Subaru"
       dealer_type: "Subaru dealer"
-      location: "Western WA"
-      distance_miles:
-      urls:
-        - "https://www.walkersrentonsubaru.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
-        - "https://www.marysvillesubaru.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
-        - "https://www.tacomassubaru.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
-        - "https://www.subaruofpuyallup.com/used-inventory/index.htm?make=Subaru&model=Crosstrek"
+      location: "Renton, WA"
+      distance_miles: 31
+      sitemap_urls:
+        - "https://r.jina.ai/http://r.jina.ai/http://https://www.rentonsubaru.com/sitemap.xml"
+      fetch_via_curl: true
+      minimum_detail_year: 2020
+      max_detail_enrichments: 3
+      normalize_only_enriched: true
+      detail_direct_fallback_on_missing_price: false
+    - name: "Subaru of Puyallup used inventory"
+      adapter: "local_subaru"
+      dealer_name: "Subaru of Puyallup"
+      dealer_type: "Subaru dealer"
+      location: "Puyallup, WA"
+      distance_miles: 52
+      sitemap_urls:
+        - "https://r.jina.ai/http://r.jina.ai/http://https://www.subaruofpuyallup.com/sitemap.xml"
+      detail_text_url_template: "https://r.jina.ai/http://r.jina.ai/http://{url}"
+      minimum_detail_year: 2020
+      max_detail_enrichments: 3
+      normalize_only_enriched: true
+      detail_direct_fallback_on_missing_price: false
 
 scoring:
   watchlist_threshold: 70

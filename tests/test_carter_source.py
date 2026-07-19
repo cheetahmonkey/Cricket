@@ -1,6 +1,6 @@
 import unittest
 
-from cricket.sources.carter import CarterSource, parse_carter_detail_text
+from cricket.sources.carter import CarterSource, LocalSubaruSource, parse_carter_detail_text
 
 
 class CarterSourceTest(unittest.TestCase):
@@ -115,6 +115,105 @@ class CarterSourceTest(unittest.TestCase):
         parsed = parse_carter_detail_text(text)
         self.assertEqual(parsed["price"], 27186)
         self.assertNotIn("mileage", parsed)
+
+    def test_parse_standard_dealer_detail_text_extracts_advertised_fields(self):
+        text = """
+        ## 2024 Subaru Crosstrek Premium
+        $28,638 Asking Price
+        $28,838 Sale Price
+        Exterior Color Crystal White Pearl Interior Color Black Odometer 9,917 miles
+        Transmission Lineartronic CVT Drivetrain AWD Engine 2.0L VIN JF2GUADC9R8385846 Stock Number S260269A
+        Exterior Parking Camera Rear
+        Subaru Certified!
+        [Free CarFax report](https://www.carfax.com/vehiclehistory/ar20/example-token)
+        """
+        parsed = parse_carter_detail_text(text)
+        self.assertEqual(parsed["trim"], "Premium")
+        self.assertEqual(parsed["price"], 28638)
+        self.assertEqual(parsed["mileage"], 9917)
+        self.assertEqual(parsed["exterior_color"], "Crystal White Pearl")
+        self.assertEqual(parsed["drivetrain"], "AWD")
+        self.assertEqual(parsed["vin"], "JF2GUADC9R8385846")
+        self.assertEqual(parsed["rear_camera"], "yes")
+        self.assertTrue(parsed["cpo"])
+        self.assertEqual(parsed["history_report_url"], "https://www.carfax.com/vehiclehistory/ar20/example-token")
+
+    def test_parse_standard_dealer_html_extracts_embedded_overview(self):
+        text = """
+        <html><head><title>Used 2023 Subaru Crosstrek Premium in Renton, WA</title></head><body><dl><dt>Exterior Color</dt><dd>Magnetite Gray Metallic</dd>
+        <dt>Interior Color</dt><dd>Black</dd><dt>Odometer</dt><dd>43,150 miles</dd>
+        <dt>Transmission</dt><dd>Lineartronic CVT</dd><dt>Drivetrain</dt><dd>AWD</dd>
+        <dt>Engine</dt><dd>2.0L</dd><dt>VIN</dt><dd>JF2GTAPC3P8241821</dd>
+        <dt>Stock Number</dt><dd>R123</dd></dl><script>{"internetPrice":24448}</script></body></html>
+        """
+        parsed = parse_carter_detail_text(text)
+        self.assertEqual(parsed["trim"], "Premium")
+        self.assertEqual(parsed["price"], 24448)
+        self.assertEqual(parsed["mileage"], 43150)
+        self.assertEqual(parsed["exterior_color"], "Magnetite Gray Metallic")
+        self.assertEqual(parsed["drivetrain"], "AWD")
+        self.assertEqual(parsed["vin"], "JF2GTAPC3P8241821")
+
+    def test_local_source_parses_standard_inventory_sitemap(self):
+        source = LocalSubaruSource({"name": "Renton Subaru used inventory"})
+        xml = """<?xml version=\"1.0\"?>
+        <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
+          <url><loc>https://www.rentonsubaru.com/used/Subaru/2023-Subaru-Crosstrek-for-sale-renton-wa-220f5f41ac1818e146e9333f21686f37.htm</loc></url>
+          <url><loc>https://www.rentonsubaru.com/used/Subaru/2023-Subaru-Forester-for-sale-renton-wa-220f5f41ac1818e146e9333f21686f37.htm</loc></url>
+        </urlset>
+        """
+        items = source.parse_sitemap(xml, "https://example.test/sitemap.xml")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["year"], 2023)
+        self.assertEqual(items[0]["listing_id"], "220f5f41ac1818e146e9333f21686f37")
+        self.assertEqual(items[0]["model"], "Crosstrek")
+
+    def test_local_source_parses_text_mirror_sitemap_links(self):
+        source = LocalSubaruSource({"name": "Puyallup inventory"})
+        text = """
+        [https://www.subaruofpuyallup.com/certified/Subaru/2024-Subaru-Crosstrek-for-sale-Tacoma-WA-1f0a8262ac1818e146e9333f01ffb9c6.htm](https://www.subaruofpuyallup.com/certified/Subaru/2024-Subaru-Crosstrek-for-sale-Tacoma-WA-1f0a8262ac1818e146e9333f01ffb9c6.htm)
+        """
+        items = source.parse_sitemap(text, "https://mirror.example/sitemap")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["year"], 2024)
+        self.assertTrue(items[0]["cpo"])
+
+    def test_sitemap_only_source_does_not_fallback_to_missing_search_page(self):
+        class EmptyLocalSource(LocalSubaruSource):
+            def fetch(self, url):
+                return "<?xml version=\"1.0\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" />"
+
+        source = EmptyLocalSource(
+            {"name": "Empty local source", "sitemap_urls": ["https://example.test/sitemap.xml"]}
+        )
+        result = source.search()
+        self.assertEqual(result.raw_items, [])
+        self.assertEqual(result.listings, [])
+
+    def test_sitemap_source_can_keep_unenriched_candidates_out_of_report_listings(self):
+        sitemap = """<?xml version=\"1.0\"?>
+        <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
+          <url><loc>https://www.cartersubarushoreline.com/auto/used-2023-subaru-crosstrek-limited-near-edmonds-wa/122620058/</loc></url>
+        </urlset>
+        """
+
+        class UnenrichedCarterSource(CarterSource):
+            def fetch(self, url):
+                return sitemap
+
+            def enrich_from_detail_text(self, raw, enriched_count=0):
+                return raw
+
+        source = UnenrichedCarterSource(
+            {
+                "name": "Sitemap-only test",
+                "sitemap_urls": ["https://example.test/sitemap.xml"],
+                "normalize_only_enriched": True,
+            }
+        )
+        result = source.search()
+        self.assertEqual(len(result.raw_items), 1)
+        self.assertEqual(result.listings, [])
 
     def test_search_tries_direct_detail_when_text_mirror_has_no_price(self):
         sitemap = """<?xml version="1.0"?>
