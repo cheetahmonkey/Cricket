@@ -104,6 +104,10 @@ class ReportTest(unittest.TestCase):
             "Safety evidence: RAB: Automatic emergency braking (rear); BSD: Blind spot safety (sensor/alert); RCTA: Cross traffic alert (rear)",
             text,
         )
+        self.assertEqual(
+            report.safe_evidence_text('<div id="detailed-specs">Blind spot detection</div>'),
+            "confirmed in dealer specifications",
+        )
         self.assertIn("CARFAX report: https://example.test/carfax", text)
         self.assertNotIn("Vehicle history:", text)
         self.assertIn("Cricket is keeping 1 listing visible for comparison", text)

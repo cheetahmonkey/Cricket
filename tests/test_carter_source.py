@@ -144,7 +144,9 @@ class CarterSourceTest(unittest.TestCase):
         <dt>Interior Color</dt><dd>Black</dd><dt>Odometer</dt><dd>43,150 miles</dd>
         <dt>Transmission</dt><dd>Lineartronic CVT</dd><dt>Drivetrain</dt><dd>AWD</dd>
         <dt>Engine</dt><dd>2.0L</dd><dt>VIN</dt><dd>JF2GTAPC3P8241821</dd>
-        <dt>Stock Number</dt><dd>R123</dd></dl><script>{"internetPrice":24448,"title":["2023 Subaru","Crosstrek Premium"]}</script></body></html>
+        <dt>Stock Number</dt><dd>R123</dd></dl><ul><li>Blind Spot Detection</li></ul>
+        <a href="https://www.carfax.com/vehiclehistory/ar20/example-token">Free CarFax report</a>
+        <script>{"internetPrice":24448,"title":["2023 Subaru","Crosstrek Premium"],"markup":"<div id='detailed-specs'>Blind spot script data</div>"}</script></body></html>
         """
         parsed = parse_carter_detail_text(text)
         self.assertEqual(parsed["trim"], "Premium")
@@ -153,6 +155,10 @@ class CarterSourceTest(unittest.TestCase):
         self.assertEqual(parsed["exterior_color"], "Magnetite Gray Metallic")
         self.assertEqual(parsed["drivetrain"], "AWD")
         self.assertEqual(parsed["vin"], "JF2GTAPC3P8241821")
+        self.assertEqual(parsed["blind_spot_detection"], "yes")
+        self.assertEqual(parsed["safety_evidence"]["BSD"], "Blind Spot Detection")
+        self.assertNotIn("<", parsed["safety_evidence"]["BSD"])
+        self.assertEqual(parsed["history_report_url"], "https://www.carfax.com/vehiclehistory/ar20/example-token")
 
     def test_local_source_parses_standard_inventory_sitemap(self):
         source = LocalSubaruSource({"name": "Renton Subaru used inventory"})

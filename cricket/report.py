@@ -1,3 +1,5 @@
+import re
+from html import unescape
 from pathlib import Path
 from typing import Dict, List
 
@@ -97,8 +99,18 @@ def safety_evidence_summary(listing: Listing) -> str:
     parts = []
     for key in ("RAB", "BSD", "RCTA"):
         if evidence.get(key):
-            parts.append("%s: %s" % (key, evidence[key]))
+            parts.append("%s: %s" % (key, safe_evidence_text(evidence[key])))
     return "; ".join(parts)
+
+
+def safe_evidence_text(value) -> str:
+    text = str(value)
+    if "<" in text:
+        return "confirmed in dealer specifications"
+    text = re.sub(r"\s+", " ", unescape(text)).strip()
+    if len(text) > 240:
+        return "%s..." % text[:237].rstrip()
+    return text
 
 
 def markdown_link(label: str, url: str) -> str:

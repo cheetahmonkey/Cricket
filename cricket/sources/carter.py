@@ -176,11 +176,7 @@ class LocalSubaruSource(CarterSource):
 
 
 def parse_carter_detail_text(text: str) -> Dict:
-    lines = [unescape(line).strip() for line in text.splitlines()]
-    if "<html" in text.lower():
-        # A few standard dealer pages expose their vehicle overview only in
-        # server-rendered HTML and embedded JSON rather than visible text.
-        lines.append(unescape(re.sub(r"<[^>]+>", " ", text)).strip())
+    lines = detail_lines(text)
     non_empty = [line for line in lines if line]
     parsed: Dict = {}
 
@@ -252,7 +248,7 @@ def parse_carter_detail_text(text: str) -> Dict:
     # Standard eProcess dealer detail pages expose the overview in compact
     # prose rather than Carter's label/value lines.
     detail_text = " ".join(non_empty)
-    standard_price = parse_standard_dealer_price(detail_text)
+    standard_price = parse_standard_dealer_price(detail_text) or parse_standard_dealer_price(text)
     if price is None and standard_price is not None:
         parsed["price"] = standard_price
     standard_mileage = re.search(r"\bOdometer\s+([\d,]+)\s+miles?\b", detail_text, re.I)
@@ -280,8 +276,10 @@ def parse_carter_detail_text(text: str) -> Dict:
     if any("one-owner" in line.lower() or "1-owner" in line.lower() for line in non_empty):
         parsed["owners"] = 1
     history_url = first_match(non_empty, r"\]\((https://www\.carfax\.com/vehiclehistory/[^)]+)\)")
+    if not history_url:
+        history_url = re.search(r"https://www\.carfax\.com/vehiclehistory/[^\"'\s<]+", text, re.I)
     if history_url:
-        parsed["history_report_url"] = history_url.group(1)
+        parsed["history_report_url"] = history_url.group(1) if history_url.lastindex else history_url.group(0)
     evidence = {}
     rab_line = first_line_containing(non_empty, ["automatic emergency braking (rear)"])
     bsd_line = first_line_containing(non_empty, ["blind spot"])
@@ -307,6 +305,16 @@ def parse_carter_detail_text(text: str) -> Dict:
     if notes:
         parsed["description"] = " ".join(notes)
     return parsed
+
+
+def detail_lines(text: str) -> List[str]:
+    """Return readable evidence lines without leaking minified dealer HTML."""
+    if "<html" not in text.lower():
+        return [unescape(line).strip() for line in text.splitlines()]
+
+    visible_html = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", text, flags=re.I | re.S)
+    visible_text = unescape(re.sub(r"<[^>]+>", "\n", visible_html))
+    return [re.sub(r"\s+", " ", line).strip() for line in visible_text.splitlines()]
 
 
 def first_match(lines: List[str], pattern: str):
