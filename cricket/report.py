@@ -228,6 +228,30 @@ def source_limitations(source_results: List[SourceResult]) -> List[str]:
     return lines
 
 
+def dealership_name(source_name: str) -> str:
+    name = source_name.replace(" / Carter Subaru group inventory", "")
+    return name.replace(" used inventory", "")
+
+
+def dealership_sourcing_rows(source_results: List[SourceResult]) -> List[List[str]]:
+    rows = []
+    for result in source_results:
+        if "certified pre-owned inventory" in result.source_name.lower():
+            continue
+        found = len(result.raw_items)
+        detailed = sum(
+            1 for item in result.raw_items if isinstance(item, dict) and item.get("detail_text_fetched")
+        )
+        if result.errors and found:
+            status = "Partial"
+        elif result.errors:
+            status = "Access issue"
+        else:
+            status = "Active"
+        rows.append([dealership_name(result.source_name), status, str(found), str(detailed)])
+    return rows
+
+
 def generate_report(
     date: str,
     listings: List[Listing],
@@ -275,11 +299,11 @@ def generate_report(
 
     lines.append("## Top Opportunities")
     if top:
-        lines.append("| Rank | Score | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting |")
-        lines.append("| ---: | ----: | ----- | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ------ | --------------------- |")
+        lines.append("| Rank | Score | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting | Date Added |")
+        lines.append("| ---: | ----: | ----- | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ------ | --------------------- | ---------- |")
         for index, listing in enumerate(top, start=1):
             lines.append(
-                "| %d | %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                "| %d | %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
                 % (
                     index,
                     listing.score,
@@ -293,6 +317,7 @@ def generate_report(
                     money(estimated_out_the_door(listing, pricing)),
                     table_cell(compact_dealer_name(listing)),
                     table_cell(visit_check(listing)),
+                    listing.first_seen_date or "Unknown",
                 )
             )
         lines.append("")
@@ -332,11 +357,11 @@ def generate_report(
     lines.append("Cricket is keeping %d listing%s visible for comparison, even though each has a concern noted below." % (len(rejected), "" if len(rejected) == 1 else "s"))
     if rejected:
         lines.append("")
-        lines.append("| # | Main Concern | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting |")
-        lines.append("| ---: | ------------ | ----- | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ------ | --------------------- |")
+        lines.append("| # | Main Concern | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting | Date Added |")
+        lines.append("| ---: | ------------ | ----- | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ------ | --------------------- | ---------- |")
         for index, listing in enumerate(rejected[:30], start=1):
             lines.append(
-                "| %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                "| %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
                 % (
                     index,
                     table_cell(listing.reject_reason or "rejected"),
@@ -350,6 +375,7 @@ def generate_report(
                     money(estimated_out_the_door(listing, pricing)),
                     table_cell(compact_dealer_name(listing)),
                     table_cell(visit_check(listing)),
+                    listing.first_seen_date or "Unknown",
                 )
             )
     lines.append("")
@@ -362,6 +388,34 @@ def generate_report(
         lines.append("### Search Notes")
         lines.extend(limitations)
         lines.append("")
+
+    lines.append("## Dealership Sourcing Status")
+    lines.append("")
+    lines.append("| Dealership | Status | Crosstreks Found | Details Checked |")
+    lines.append("| ---------- | ------ | ----------------: | --------------: |")
+    for dealer, status, found, detailed in dealership_sourcing_rows(source_results):
+        lines.append(
+            "| %s | %s | %s | %s |"
+            % (table_cell(dealer), table_cell(status), found, detailed)
+        )
+    lines.append("")
+
+    lines.append("## Scoring Key")
+    lines.append("")
+    lines.append("Safety requirements are checked first. A vehicle can stay out of Top Opportunities even with a good point total when required safety evidence, mileage, title, or transmission does not pass Cricket's filters.")
+    lines.append("")
+    lines.append("| Category | Maximum | What Cricket Rewards |")
+    lines.append("| -------- | ------: | -------------------- |")
+    lines.append("| Required safety features | 25 | Strong evidence for rear camera, BSD, RCTA, and especially RAB |")
+    lines.append("| Price and value | 20 | A better price versus expected market value; 10 points are used when market value is unavailable |")
+    lines.append("| Mileage | 15 | Lower mileage, with full points below 15,000 miles |")
+    lines.append("| Year and trim | 10 | Preferred model years and Limited trim |")
+    lines.append("| Seller quality | 10 | Carter and established Subaru dealers |")
+    lines.append("| Convenience | 10 | Shorter distance from Edmonds |")
+    lines.append("| Vehicle history | 5 | Clean, well-documented history and fewer owners |")
+    lines.append("| Mom-fit extras | 5 | Heated seats, easy access, useful comfort features, and preferred colors |")
+    lines.append("| **Total** | **100** | Higher scores indicate a stronger overall fit after safety screening |")
+    lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")
     return path

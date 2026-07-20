@@ -137,11 +137,26 @@ def load_previous_state() -> Dict[str, Dict]:
     }
 
 
+def load_first_seen_dates() -> Dict[str, str]:
+    ensure_storage()
+    with sqlite3.connect(DB_PATH) as conn:
+        listing_rows = conn.execute("select listing_key, first_seen_date from listings").fetchall()
+        rejected_rows = conn.execute(
+            "select listing_key, min(run_date) from rejected_listings group by listing_key"
+        ).fetchall()
+    dates = {key: date for key, date in listing_rows}
+    for key, date in rejected_rows:
+        if key not in dates or date < dates[key]:
+            dates[key] = date
+    return dates
+
+
 def save_history(date: str, listings: Iterable[Listing], rejected: Iterable[Listing]) -> Tuple[List[str], List[str], Dict[str, int]]:
     ensure_storage()
     listings = list(listings)
     rejected = list(rejected)
     previous = load_previous_state()
+    first_seen_dates = load_first_seen_dates()
     current_keys = {listing.key() for listing in listings}
     previous_keys = set(previous.keys())
     new_keys = sorted(current_keys - previous_keys)
@@ -155,10 +170,7 @@ def save_history(date: str, listings: Iterable[Listing], rejected: Iterable[List
             if old and old["last_price"] is not None and listing.price is not None and old["last_price"] != listing.price:
                 price_changes[key] = listing.price - old["last_price"]
                 listing.price_change = price_changes[key]
-            if old:
-                listing.first_seen_date = old["payload"].get("first_seen_date") or date
-            else:
-                listing.first_seen_date = date
+            listing.first_seen_date = first_seen_dates.get(key, date)
             listing.last_seen_date = date
             payload = json.dumps(listing.to_dict(), sort_keys=True)
             conn.execute(
@@ -178,6 +190,8 @@ def save_history(date: str, listings: Iterable[Listing], rejected: Iterable[List
                 (date, key, listing.price, listing.mileage, listing.score, payload),
             )
         for listing in rejected:
+            listing.first_seen_date = first_seen_dates.get(listing.key(), date)
+            listing.last_seen_date = date
             conn.execute(
                 "insert into rejected_listings (run_date, listing_key, reject_reason, payload_json) values (?, ?, ?, ?)",
                 (date, listing.key(), listing.reject_reason, json.dumps(listing.to_dict(), sort_keys=True)),
