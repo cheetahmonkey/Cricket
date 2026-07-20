@@ -124,8 +124,8 @@ class LocalSubaruSource(CarterSource):
     """Read standard dealer eProcess inventory sitemaps conservatively.
 
     These dealers publish individual inventory URLs in their sitemaps, but use a
-    different URL layout than Carter.  Detail enrichment is intentionally capped
-    in configuration so the daily search is not a page crawl.
+    different URL layout than Carter. Detail enrichment can be bounded by
+    configuration when a source requires it.
     """
 
     def parse_sitemap(self, xml_text: str, sitemap_url: str) -> List[Dict]:
