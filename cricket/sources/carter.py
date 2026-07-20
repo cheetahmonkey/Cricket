@@ -214,6 +214,17 @@ def parse_carter_detail_text(text: str) -> Dict:
         parsed.setdefault("model", "Crosstrek")
         parsed.setdefault("trim", clean_trim(standard_title.group(2)))
 
+    embedded_title = re.search(
+        r'"title"\s*:\s*\[\s*"(\d{4})\s+Subaru"\s*,\s*"Crosstrek\s+([^"]+)"\s*\]',
+        text,
+        re.I,
+    )
+    if embedded_title:
+        parsed.setdefault("year", int(embedded_title.group(1)))
+        parsed.setdefault("make", "Subaru")
+        parsed.setdefault("model", "Crosstrek")
+        parsed.setdefault("trim", clean_trim(embedded_title.group(2)))
+
     price = parse_price(non_empty, text)
     if price is not None:
         parsed["price"] = price

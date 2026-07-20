@@ -144,7 +144,7 @@ class CarterSourceTest(unittest.TestCase):
         <dt>Interior Color</dt><dd>Black</dd><dt>Odometer</dt><dd>43,150 miles</dd>
         <dt>Transmission</dt><dd>Lineartronic CVT</dd><dt>Drivetrain</dt><dd>AWD</dd>
         <dt>Engine</dt><dd>2.0L</dd><dt>VIN</dt><dd>JF2GTAPC3P8241821</dd>
-        <dt>Stock Number</dt><dd>R123</dd></dl><script>{"internetPrice":24448}</script></body></html>
+        <dt>Stock Number</dt><dd>R123</dd></dl><script>{"internetPrice":24448,"title":["2023 Subaru","Crosstrek Premium"]}</script></body></html>
         """
         parsed = parse_carter_detail_text(text)
         self.assertEqual(parsed["trim"], "Premium")

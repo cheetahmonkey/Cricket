@@ -115,7 +115,6 @@ sources:
         - "https://r.jina.ai/http://r.jina.ai/http://https://www.rentonsubaru.com/sitemap.xml"
       fetch_via_curl: true
       minimum_detail_year: 2020
-      max_detail_enrichments: 3
       normalize_only_enriched: true
       detail_direct_fallback_on_missing_price: false
     - name: "Subaru of Puyallup used inventory"
@@ -126,9 +125,8 @@ sources:
       distance_miles: 52
       sitemap_urls:
         - "https://r.jina.ai/http://r.jina.ai/http://https://www.subaruofpuyallup.com/sitemap.xml"
-      detail_text_url_template: "https://r.jina.ai/http://r.jina.ai/http://{url}"
+      fetch_via_curl: true
       minimum_detail_year: 2020
-      max_detail_enrichments: 3
       normalize_only_enriched: true
       detail_direct_fallback_on_missing_price: false
 
