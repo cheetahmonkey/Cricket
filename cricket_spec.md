@@ -8,6 +8,13 @@ The agent should search for used Subaru Crosstreks that match Mom’s required s
 
 The agent should prioritize practical, low-risk, local purchasing opportunities over theoretical best prices.
 
+### Operating principle
+
+Err on the side of information retrieval over presentation. Prefer deeper,
+more accurate vehicle information, and then make the report resilient to any
+presentation imperfections. Do not stop investigating a field merely because
+the first extraction path is missing or inconvenient.
+
 ## 2. Buyer Profile
 
 Buyer: Mom

@@ -41,6 +41,11 @@ which intentionally do not receive detail enrichment.
 
 ### Important Source Rules
 
+- **Operating principle:** err on the side of information retrieval over
+  presentation. Prefer deeper, more accurate vehicle information; make the
+  report resilient to presentation imperfections afterward. A missing or
+  awkward first extraction path is a prompt to investigate the dealer page's
+  other visible or structured data, not a reason to stop at "unknown."
 - Renton and Puyallup have **no per-run detail cap**. This was deliberately
   removed at the user's request. Keep `minimum_detail_year: 2020`, but do not
   reintroduce `max_detail_enrichments` for these sources without discussion.
