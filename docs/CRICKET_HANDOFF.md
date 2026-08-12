@@ -17,8 +17,15 @@ derived from the same Markdown report, not maintained as separate reports.
   evidence supports them.
 - Safety is the first gate: rear camera, Blind Spot Detection (BSD), Rear
   Cross-Traffic Alert (RCTA), and especially Reverse Automatic Braking (RAB).
-- Preferred colors: blue/teal, then burgundy/green, then white. Black, silver,
-  and gray are lower preference but are not disqualifiers.
+- Mom's emerging budget is below $30,000 estimated out the door. This is the
+  budget ceiling for the Top Picks for Mom view, not a hard filter on the two
+  existing selection-pool tables.
+- Color has increased importance in Top Picks for Mom: require a known color
+  outside the black, gray/grey (including silver), and white families. Treat
+  Cool Gray Khaki as part of the blue family. Non-white pearl colors such as
+  blue pearl or red pearl remain eligible.
+- The broader scoring system still prefers blue/teal, then burgundy/green,
+  then white. Black, silver, and gray remain visible in the existing tables.
 - Carter Shoreline and Carter Ballard are preferred sellers; other Subaru
   dealers remain valuable local sources.
 
@@ -88,6 +95,13 @@ The report must remain practical for Mom and family, not a technical run log.
 - The canonical report is `reports/YYYY-MM-DD_crosstrek_search_report.md`.
 - Keep the short event-driven Morning Note. Do not repeat a generic daily
   statement when nothing meaningful changed.
+- Keep `Top Picks for Mom: under $30k + Color` as the first table. Its pool is the union of Top
+  Opportunities and Other Listings to Keep in View. Include only listings with
+  known colors outside the black, gray/grey/silver, and white families and
+  estimated OTD strictly below $30,000. Cool Gray Khaki is an explicit eligible
+  exception. Sort by `Date Added` newest first. Do not remove
+  matching rows from either existing table, and show `Main Concern` because a
+  Top Pick may still be a watchlist listing.
 - Top Opportunities and Other Listings tables both use this order at the left:
   rank/number, score or concern, direct linked color, year, trim, safety,
   feature confidence, miles, price, estimated OTD, seller, visit check, and
@@ -151,7 +165,7 @@ Test suite:
 python3 -m unittest discover -s tests -v
 ```
 
-The daily runner is `scripts/run_daily_cricket.sh`. It:
+The daily workflow is `scripts/run_daily_cricket.sh`. It:
 
 1. Runs Cricket and syncs the report/raw/normalized files to the Windows data
    store configured at `/mnt/c/MMM/data/Mom/Cricket`.
@@ -161,6 +175,14 @@ The daily runner is `scripts/run_daily_cricket.sh`. It:
    family Google Drive folder through `rclone`.
 
 The intended cron schedule is 7:15 a.m. Pacific. Logs are in `logs/`.
+
+Cron invokes `scripts/run_daily_cricket_healthchecked.sh`, which wraps the
+daily workflow with Healthchecks.io start, success, and exit-status failure
+pings. The private ping URL lives outside Git at
+`/home/mmm/.config/cricket/healthchecks_url` with mode `600`. A Healthchecks
+network error is logged but never prevents Cricket from running. Manual runs
+may continue to call `scripts/run_daily_cricket.sh` directly without affecting
+the scheduled check.
 
 Useful manual publication commands:
 

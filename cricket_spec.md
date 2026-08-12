@@ -318,7 +318,7 @@ Color is scored as part of **Mom-fit extras** and should also be captured separa
 | Med        | White               | Acceptable / neutral                                                           |
 | Low        | Black, silver, gray | Lower priority; no color bonus unless the total listing is otherwise excellent |
 
-The scoring system should not reject a listing based on color alone. Color should influence ranking only after safety, price, mileage, seller quality, and vehicle history.
+The scoring system should not reject a listing from the broader selection pool based on color alone. Color should influence general ranking only after safety, price, mileage, seller quality, and vehicle history. The separate **Top Picks for Mom** report view is intentionally stricter: it requires a known non-black, non-gray/grey/silver, non-white color. Cool Gray Khaki is treated as part of the blue family, and non-white pearl colors remain eligible.
 
 ## 12. Detailed Scoring Rules
 
@@ -475,10 +475,13 @@ Filename format:
 0. **Summary**
    Two to three sentences only. Include whether there are any strong opportunities, whether any Carter/Subaru/CPO listings are notable, and whether action is needed.
 
-1. **Top Opportunities**
+1. **Top Picks for Mom: under $30k + Color**
+   An additional view over both Top Opportunities and Other Listings to Keep in View. Include only listings with estimated OTD strictly below $30,000 and a known color outside the black, gray/grey/silver, and white families. Treat Cool Gray Khaki as part of the blue family. Sort by Date Added newest first and retain any watchlist concern.
+
+2. **Top Opportunities**
    Ranked list of the best candidates.
 
-2. **New / Rejected / Price Drop Listings**
+3. **New / Rejected / Price Drop Listings**
    Compact change log showing new listings, rejected listings with reasons, and price drops.
 
 ### Top-opportunity table

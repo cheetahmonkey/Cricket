@@ -83,6 +83,7 @@ def run_search(config_path=DEFAULT_CONFIG_PATH) -> RunResult:
         price_changes,
         inventory_changes,
         config.get("pricing", {}),
+        config.get("top_picks_for_mom", {}),
     )
     sync_paths, sync_errors = sync_run_outputs(config, [report_path, raw_path, normalized_path])
 

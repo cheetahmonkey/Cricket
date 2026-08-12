@@ -20,6 +20,12 @@ pricing:
   dealer_doc_fee: 200
   wa_registration_estimate: 700
 
+top_picks_for_mom:
+  max_out_the_door: 30000
+  excluded_color_families: ["black", "gray", "grey", "silver", "white"]
+  included_color_exceptions: ["cool gray khaki"]
+  require_known_color: true
+
 vehicle:
   make: "Subaru"
   model: "Crosstrek"

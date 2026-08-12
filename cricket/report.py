@@ -126,6 +126,49 @@ def linked_color(listing: Listing) -> str:
     return markdown_link(color, listing.source_url)
 
 
+def top_pick_color_is_eligible(listing: Listing, top_picks_config: Dict) -> bool:
+    color = (listing.exterior_color or "").strip().lower()
+    require_known_color = top_picks_config.get("require_known_color", True)
+    unknown_colors = {"", "unknown", "n/a", "na", "not available", "not specified"}
+    if require_known_color and color in unknown_colors:
+        return False
+
+    included_exceptions = top_picks_config.get(
+        "included_color_exceptions", ["cool gray khaki"]
+    )
+    if any(str(exception).lower() in color for exception in included_exceptions):
+        return True
+
+    excluded_families = top_picks_config.get(
+        "excluded_color_families", ["black", "gray", "grey", "silver", "white"]
+    )
+    return not any(str(family).lower() in color for family in excluded_families)
+
+
+def select_top_picks_for_mom(
+    listings: List[Listing],
+    rejected: List[Listing],
+    pricing: Dict,
+    top_picks_config: Dict,
+) -> List[Listing]:
+    """Return budget/color matches from the full current report selection pool."""
+    max_out_the_door = top_picks_config.get("max_out_the_door", 30000)
+    picks = []
+    for listing in list(listings) + list(rejected):
+        out_the_door = estimated_out_the_door(listing, pricing)
+        if out_the_door is None or out_the_door >= max_out_the_door:
+            continue
+        if not top_pick_color_is_eligible(listing, top_picks_config):
+            continue
+        picks.append(listing)
+
+    # Date Added is the primary sort. Lower OTD provides a deterministic,
+    # budget-aligned order when multiple listings were first seen together.
+    picks.sort(key=lambda item: estimated_out_the_door(item, pricing))
+    picks.sort(key=lambda item: item.first_seen_date or "", reverse=True)
+    return picks
+
+
 def compact_dealer_name(listing: Listing) -> str:
     dealer = listing.dealer_name or listing.source
     dealer = dealer.replace("Carter Subaru Shoreline", "Carter Shoreline")
@@ -274,11 +317,14 @@ def generate_report(
     price_changes: Dict[str, int],
     inventory_changes: Dict = None,
     pricing: Dict = None,
+    top_picks_config: Dict = None,
 ) -> Path:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / ("%s_crosstrek_search_report.md" % date)
     top = sorted(listings, key=lambda item: item.score, reverse=True)
     pricing = pricing or {}
+    top_picks_config = top_picks_config or {}
+    top_picks = select_top_picks_for_mom(listings, rejected, pricing, top_picks_config)
     lines: List[str] = []
     lines.append("# %s Crosstrek Search Report" % date)
     lines.append("")
@@ -300,6 +346,42 @@ def generate_report(
             lines.append("Cricket found no qualifying listings today. Source access or sparse dealer markup may have limited the results, so this report should be treated as a conservative first pass.")
         lines.append("Cricket says: a good listing still needs clear RAB evidence before it becomes a real candidate.")
         lines.append("")
+
+    max_top_pick_otd = top_picks_config.get("max_out_the_door", 30000)
+    lines.append("## Top Picks for Mom: under $30k + Color")
+    lines.append("")
+    lines.append(
+        "Newest listings from the full current selection pool with estimated OTD below %s and a known color outside the black, gray/silver, and white families. Cool Gray Khaki is treated as blue. Watchlist concerns still apply."
+        % money(max_top_pick_otd)
+    )
+    if top_picks:
+        lines.append("")
+        lines.append("| # | Date Added | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Main Concern | Check Before Visiting |")
+        lines.append("| ---: | ---------- | ----- | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ------ | ------------ | --------------------- |")
+        for index, listing in enumerate(top_picks, start=1):
+            lines.append(
+                "| %d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |"
+                % (
+                    index,
+                    listing.first_seen_date or "Unknown",
+                    table_cell(linked_color(listing)),
+                    listing.year or "Unknown",
+                    table_cell(listing.trim or "Unknown"),
+                    table_cell(rear_package_safety(listing)),
+                    table_cell(listing.feature_confidence),
+                    miles(listing.mileage),
+                    money(listing.price),
+                    money(estimated_out_the_door(listing, pricing)),
+                    table_cell(compact_dealer_name(listing)),
+                    table_cell(listing.reject_reason or "None noted"),
+                    table_cell(visit_check(listing)),
+                )
+            )
+    else:
+        lines.append("")
+        lines.append("No current listings meet Mom's budget and color requirements.")
+    lines.append("")
+
     inventory_lines = compact_inventory_changes(inventory_changes or {})
     if inventory_lines:
         lines.append("## What Changed Since Yesterday")
