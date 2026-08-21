@@ -8,6 +8,18 @@ from ..normalize import normalize_items
 from .base import SourceAdapter
 
 
+def detail_access_is_blocked(text: str) -> bool:
+    lower = (text or "").lower()
+    cloudflare_html = "just a moment" in lower and (
+        "cf-mitigated" in lower or "challenge-platform" in lower or "cf-chl" in lower
+    )
+    text_mirror_challenge = (
+        "performing security verification" in lower
+        and "protect against malicious bots" in lower
+    )
+    return cloudflare_html or text_mirror_challenge
+
+
 class CarterSource(SourceAdapter):
     def sitemap_urls(self) -> List[str]:
         return self.config.get("sitemap_urls") or []
@@ -19,6 +31,7 @@ class CarterSource(SourceAdapter):
         result = SourceResult(source_name=self.name)
         seen = set()
         enriched_count = 0
+        blocked_count = 0
         for sitemap_url in self.sitemap_urls():
             try:
                 xml_text = self.fetch(sitemap_url)
@@ -32,6 +45,8 @@ class CarterSource(SourceAdapter):
                     enriched = self.enrich_from_detail_text(item, enriched_count)
                     if enriched.get("detail_text_fetched"):
                         enriched_count += 1
+                    if enriched.get("detail_access_blocked"):
+                        blocked_count += 1
                     unique_items.append(enriched)
                 result.raw_items.extend(unique_items)
                 normalized_items = unique_items
@@ -46,6 +61,11 @@ class CarterSource(SourceAdapter):
             result.errors.extend(fallback.errors)
             result.raw_items.extend(fallback.raw_items)
             result.listings.extend(fallback.listings)
+        if blocked_count:
+            result.errors.append(
+                "%d detail page%s returned a security-verification challenge"
+                % (blocked_count, "" if blocked_count == 1 else "s")
+            )
         return result
 
     def detail_text_url(self, vehicle_url: str) -> str:
@@ -67,14 +87,30 @@ class CarterSource(SourceAdapter):
             return raw
 
         raw["detail_text_url"] = detail_url
-        raw["detail_text_fetched"] = True
-        parsed = parse_carter_detail_text(detail_text)
+        detail_blocked = detail_access_is_blocked(detail_text)
+        if detail_blocked:
+            raw["detail_access_blocked"] = True
+            raw.setdefault("detail_errors", []).append(
+                "%s: security-verification challenge" % detail_url
+            )
+            parsed = {}
+        else:
+            raw["detail_text_fetched"] = True
+            parsed = parse_carter_detail_text(detail_text)
         if parsed.get("price") is None and self.config.get("detail_direct_fallback_on_missing_price") and detail_url != raw["url"]:
             try:
                 direct_text = self.fetch(raw["url"])
                 raw["detail_direct_url"] = raw["url"]
-                direct_parsed = parse_carter_detail_text(direct_text)
-                parsed.update({key: value for key, value in direct_parsed.items() if value not in (None, "", [])})
+                if detail_access_is_blocked(direct_text):
+                    raw["detail_access_blocked"] = True
+                    raw.setdefault("detail_errors", []).append(
+                        "%s: security-verification challenge" % raw["url"]
+                    )
+                else:
+                    raw["detail_text_fetched"] = True
+                    raw.pop("detail_access_blocked", None)
+                    direct_parsed = parse_carter_detail_text(direct_text)
+                    parsed.update({key: value for key, value in direct_parsed.items() if value not in (None, "", [])})
             except OSError as exc:
                 raw.setdefault("detail_errors", []).append("%s: %s" % (raw["url"], exc))
         raw.update({key: value for key, value in parsed.items() if value not in (None, "", [])})

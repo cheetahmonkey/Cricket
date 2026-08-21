@@ -1,9 +1,51 @@
 import unittest
 
-from cricket.sources.carter import CarterSource, LocalSubaruSource, parse_carter_detail_text
+from cricket.sources.carter import (
+    CarterSource,
+    LocalSubaruSource,
+    detail_access_is_blocked,
+    parse_carter_detail_text,
+)
 
 
 class CarterSourceTest(unittest.TestCase):
+    def test_detects_text_mirror_security_challenge(self):
+        text = """
+        Title: Just a moment...
+        ## Performing security verification
+        This website uses a security service to protect against malicious bots.
+        """
+        self.assertTrue(detail_access_is_blocked(text))
+
+    def test_security_challenge_is_not_counted_as_detail_fetch(self):
+        sitemap = """<?xml version="1.0"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://www.cartersubaruballard.com/auto/used-2024-subaru-crosstrek-limited-seattle-wa/124279866/</loc></url>
+        </urlset>
+        """
+        challenge = """
+        Title: Just a moment...
+        ## Performing security verification
+        This website uses a security service to protect against malicious bots.
+        """
+
+        class BlockedCarterSource(CarterSource):
+            def fetch(self, url):
+                return sitemap if "sitemap" in url else challenge
+
+        source = BlockedCarterSource(
+            {
+                "name": "Carter Subaru Ballard",
+                "sitemap_urls": ["https://example.test/sitemap.xml"],
+                "detail_text_url_template": "https://details.example/{url}",
+            }
+        )
+        result = source.search()
+        self.assertTrue(result.raw_items[0]["detail_access_blocked"])
+        self.assertNotIn("detail_text_fetched", result.raw_items[0])
+        self.assertEqual(len(result.listings), 1)
+        self.assertIn("security-verification challenge", result.errors[0])
+
     def test_parse_sitemap_used_crosstrek_urls(self):
         source = CarterSource({"name": "Carter Subaru Shoreline used inventory"})
         xml = """<?xml version="1.0"?>

@@ -31,6 +31,9 @@ def report_action(listing: Listing) -> str:
 
 def visit_check(listing: Listing) -> str:
     checks = []
+    fallback = listing.raw.get("historical_fallback", {})
+    if isinstance(fallback, dict) and fallback.get("last_verified_date"):
+        checks.append("Recheck Carter data (last verified %s)" % fallback["last_verified_date"])
     if listing.feature_confidence != "confirmed":
         checks.append("Verify RAB")
     if listing.history_report_url:

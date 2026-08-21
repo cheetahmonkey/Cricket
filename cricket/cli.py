@@ -7,7 +7,14 @@ from .models import Listing, RunResult
 from .report import generate_report
 from .scoring import apply_hard_filters, infer_features, score_listing
 from .sources import build_source
-from .storage import ensure_storage, inventory_changes_since_previous, save_history, save_normalized, save_raw
+from .storage import (
+    ensure_storage,
+    inventory_changes_since_previous,
+    restore_blocked_listing_details,
+    save_history,
+    save_normalized,
+    save_raw,
+)
 from .sync import sync_run_outputs
 
 
@@ -55,9 +62,12 @@ def run_search(config_path=DEFAULT_CONFIG_PATH) -> RunResult:
         source_results.append(result)
         all_listings.extend(result.listings)
 
+    all_listings = dedupe(all_listings)
+    restore_blocked_listing_details(date, all_listings)
+
     qualified = []
     rejected = []
-    for listing in dedupe(all_listings):
+    for listing in all_listings:
         apply_manual_overrides(listing, config)
         infer_features(listing)
         score_listing(listing, config)

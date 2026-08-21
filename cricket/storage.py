@@ -12,6 +12,105 @@ NORMALIZED_DIR = DATA_DIR / "listings_normalized"
 DB_PATH = DATA_DIR / "listings_history.sqlite"
 
 
+HISTORICAL_DETAIL_FIELDS = (
+    "price",
+    "mileage",
+    "exterior_color",
+    "interior_color",
+    "drivetrain",
+    "transmission",
+    "vin",
+    "stock_number",
+    "cpo",
+    "owners",
+    "history_report_url",
+    "rear_camera",
+    "blind_spot_detection",
+    "rear_cross_traffic_alert",
+    "reverse_automatic_braking",
+    "safety_evidence",
+)
+
+
+def known_detail_value(value) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "unknown", "n/a", "na", "not available", "not specified"}
+    if isinstance(value, (list, dict)):
+        return bool(value)
+    return True
+
+
+def historical_field_date(payload: Dict, field: str, snapshot_date: str) -> str:
+    fallback = payload.get("raw", {}).get("historical_fallback", {})
+    if not isinstance(fallback, dict):
+        return snapshot_date
+    field_dates = fallback.get("field_dates", {})
+    if isinstance(field_dates, dict) and field_dates.get(field):
+        return str(field_dates[field])
+    return str(fallback.get("last_verified_date") or snapshot_date)
+
+
+def restore_blocked_listing_details(date: str, listings: Iterable[Listing]) -> int:
+    """Restore last-known dealer facts only after a detail access challenge.
+
+    Each restored field keeps the date of the source snapshot where it was last
+    directly known. A fallback snapshot can therefore be used on later runs
+    without making an old price or mileage appear newly verified.
+    """
+    targets = {
+        (listing.source, listing.listing_id): listing
+        for listing in listings
+        if listing.listing_id and listing.raw.get("detail_access_blocked")
+    }
+    if not targets:
+        return 0
+
+    restored_fields: Dict[Tuple[str, str], Dict[str, str]] = {key: {} for key in targets}
+    candidates = sorted(
+        (path for path in NORMALIZED_DIR.glob("*.json") if path.stem < date),
+        reverse=True,
+    )
+    for path in candidates:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        for prior in payload.get("qualified", []) + payload.get("rejected", []):
+            key = (prior.get("source", ""), prior.get("listing_id"))
+            listing = targets.get(key)
+            if listing is None:
+                continue
+            for field in HISTORICAL_DETAIL_FIELDS:
+                if field in restored_fields[key]:
+                    continue
+                current_value = getattr(listing, field)
+                prior_value = prior.get(field)
+                if known_detail_value(current_value) or not known_detail_value(prior_value):
+                    continue
+                setattr(listing, field, prior_value)
+                listing.raw[field] = prior_value
+                restored_fields[key][field] = historical_field_date(prior, field, path.stem)
+
+    restored_listings = 0
+    for key, field_dates in restored_fields.items():
+        if not field_dates:
+            continue
+        listing = targets[key]
+        # Use the oldest restored field date for the single report-facing date.
+        # Per-field dates remain available in metadata for exact auditing.
+        last_verified_date = min(field_dates.values())
+        listing.raw["historical_fallback"] = {
+            "fields": sorted(field_dates),
+            "field_dates": dict(sorted(field_dates.items())),
+            "last_verified_date": last_verified_date,
+        }
+        listing.notes.append(
+            "Dealer detail access was blocked; known fields were restored from Cricket history, last verified through %s."
+            % last_verified_date
+        )
+        restored_listings += 1
+    return restored_listings
+
+
 def ensure_storage() -> None:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     NORMALIZED_DIR.mkdir(parents=True, exist_ok=True)
