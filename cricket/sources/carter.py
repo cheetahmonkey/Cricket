@@ -51,7 +51,11 @@ class CarterSource(SourceAdapter):
                 result.raw_items.extend(unique_items)
                 normalized_items = unique_items
                 if self.config.get("normalize_only_enriched"):
-                    normalized_items = [item for item in unique_items if item.get("detail_text_fetched")]
+                    normalized_items = [
+                        item
+                        for item in unique_items
+                        if item.get("detail_text_fetched") or item.get("detail_access_blocked")
+                    ]
                 result.listings.extend(normalize_items(normalized_items, self.source_defaults(sitemap_url)))
             except (ET.ParseError, OSError) as exc:
                 result.errors.append("%s: %s" % (sitemap_url, exc))
@@ -63,7 +67,7 @@ class CarterSource(SourceAdapter):
             result.listings.extend(fallback.listings)
         if blocked_count:
             result.errors.append(
-                "%d detail page%s returned a security-verification challenge"
+                "%d detail page%s could not be accessed; historical values were used when available"
                 % (blocked_count, "" if blocked_count == 1 else "s")
             )
         return result
@@ -83,6 +87,7 @@ class CarterSource(SourceAdapter):
         try:
             detail_text = self.fetch(detail_url)
         except OSError as exc:
+            raw["detail_access_blocked"] = True
             raw.setdefault("detail_errors", []).append("%s: %s" % (detail_url, exc))
             return raw
 
@@ -97,7 +102,7 @@ class CarterSource(SourceAdapter):
         else:
             raw["detail_text_fetched"] = True
             parsed = parse_carter_detail_text(detail_text)
-        if parsed.get("price") is None and self.config.get("detail_direct_fallback_on_missing_price") and detail_url != raw["url"]:
+        if not detail_blocked and parsed.get("price") is None and self.config.get("detail_direct_fallback_on_missing_price") and detail_url != raw["url"]:
             try:
                 direct_text = self.fetch(raw["url"])
                 raw["detail_direct_url"] = raw["url"]
@@ -112,6 +117,7 @@ class CarterSource(SourceAdapter):
                     direct_parsed = parse_carter_detail_text(direct_text)
                     parsed.update({key: value for key, value in direct_parsed.items() if value not in (None, "", [])})
             except OSError as exc:
+                raw["detail_access_blocked"] = True
                 raw.setdefault("detail_errors", []).append("%s: %s" % (raw["url"], exc))
         raw.update({key: value for key, value in parsed.items() if value not in (None, "", [])})
         return raw

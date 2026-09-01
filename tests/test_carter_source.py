@@ -44,7 +44,40 @@ class CarterSourceTest(unittest.TestCase):
         self.assertTrue(result.raw_items[0]["detail_access_blocked"])
         self.assertNotIn("detail_text_fetched", result.raw_items[0])
         self.assertEqual(len(result.listings), 1)
-        self.assertIn("security-verification challenge", result.errors[0])
+        self.assertIn("could not be accessed", result.errors[0])
+
+    def test_detail_fetch_error_is_restorable_and_does_not_try_direct_page(self):
+        sitemap = """<?xml version="1.0"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url><loc>https://www.cartersubaruballard.com/auto/used-2024-subaru-crosstrek-limited-seattle-wa/124279866/</loc></url>
+        </urlset>
+        """
+
+        class FailedDetailSource(CarterSource):
+            def __init__(self):
+                super().__init__(
+                    {
+                        "name": "Carter Subaru Ballard",
+                        "sitemap_urls": ["https://example.test/sitemap.xml"],
+                        "detail_text_url_template": "https://details.example/{url}",
+                        "detail_direct_fallback_on_missing_price": True,
+                    }
+                )
+                self.urls_fetched = []
+
+            def fetch(self, url):
+                self.urls_fetched.append(url)
+                if "sitemap" in url:
+                    return sitemap
+                raise OSError("HTTP Error 401: Unauthorized")
+
+        source = FailedDetailSource()
+        result = source.search()
+        self.assertTrue(result.raw_items[0]["detail_access_blocked"])
+        self.assertEqual(len(result.listings), 1)
+        self.assertEqual(len(source.urls_fetched), 2)
+        self.assertNotIn(result.raw_items[0]["url"], source.urls_fetched)
+        self.assertIn("could not be accessed", result.errors[0])
 
     def test_parse_sitemap_used_crosstrek_urls(self):
         source = CarterSource({"name": "Carter Subaru Shoreline used inventory"})
@@ -262,6 +295,31 @@ class CarterSourceTest(unittest.TestCase):
         result = source.search()
         self.assertEqual(len(result.raw_items), 1)
         self.assertEqual(result.listings, [])
+
+    def test_sitemap_source_keeps_access_failed_candidates_for_history(self):
+        sitemap = """<?xml version=\"1.0\"?>
+        <urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">
+          <url><loc>https://www.rentonsubaru.com/used/Subaru/2023-Subaru-Crosstrek-for-sale-renton-wa-220f5f41ac1818e146e9333f21686f37.htm</loc></url>
+        </urlset>
+        """
+
+        class FailedLocalSource(LocalSubaruSource):
+            def fetch(self, url):
+                if "sitemap" in url:
+                    return sitemap
+                raise OSError("HTTP Error 403: Forbidden")
+
+        source = FailedLocalSource(
+            {
+                "name": "Renton Subaru used inventory",
+                "sitemap_urls": ["https://example.test/sitemap.xml"],
+                "normalize_only_enriched": True,
+            }
+        )
+        result = source.search()
+        self.assertEqual(len(result.raw_items), 1)
+        self.assertEqual(len(result.listings), 1)
+        self.assertTrue(result.listings[0].raw["detail_access_blocked"])
 
     def test_search_tries_direct_detail_when_text_mirror_has_no_price(self):
         sitemap = """<?xml version="1.0"?>

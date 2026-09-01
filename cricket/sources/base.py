@@ -40,7 +40,7 @@ class SourceAdapter:
         if self.config.get("fetch_via_curl"):
             try:
                 completed = subprocess.run(
-                    ["curl", "-Ls", url],
+                    ["curl", "-LfsS", url],
                     check=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,

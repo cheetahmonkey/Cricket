@@ -18,6 +18,37 @@ from .storage import (
 from .sync import sync_run_outputs
 
 
+def dataset_quality_issues(source_results) -> List[str]:
+    """Return publication-blocking source coverage problems."""
+    issues = []
+    for result in source_results:
+        if "certified pre-owned inventory" in result.source_name.lower():
+            continue
+        found = len(result.raw_items)
+        if found == 0:
+            issues.append("%s discovered no inventory candidates" % result.source_name)
+            continue
+        usable = sum(
+            1
+            for item in result.raw_items
+            if isinstance(item, dict)
+            and (item.get("detail_text_fetched") or item.get("historical_fallback"))
+        )
+        minimum_usable = max(1, (found + 1) // 2)
+        if usable < minimum_usable:
+            issues.append(
+                "%s has only %d usable detail record%s out of %d"
+                % (result.source_name, usable, "" if usable == 1 else "s", found)
+            )
+    return issues
+
+
+def ensure_dataset_quality(source_results) -> None:
+    issues = dataset_quality_issues(source_results)
+    if issues:
+        raise RuntimeError("Cricket dataset quality check failed: %s" % "; ".join(issues))
+
+
 def dedupe(listings: List[Listing]) -> List[Listing]:
     seen = {}
     for listing in listings:
@@ -64,6 +95,8 @@ def run_search(config_path=DEFAULT_CONFIG_PATH) -> RunResult:
 
     all_listings = dedupe(all_listings)
     restore_blocked_listing_details(date, all_listings)
+    raw_path = save_raw(date, source_results)
+    ensure_dataset_quality(source_results)
 
     qualified = []
     rejected = []
@@ -80,7 +113,6 @@ def run_search(config_path=DEFAULT_CONFIG_PATH) -> RunResult:
 
     qualified = sorted(qualified, key=lambda item: item.score, reverse=True)
     inventory_changes = inventory_changes_since_previous(date, qualified, rejected)
-    raw_path = save_raw(date, source_results)
     new_keys, removed_keys, price_changes = save_history(date, qualified, rejected)
     normalized_path = save_normalized(date, qualified, rejected)
     report_path = generate_report(

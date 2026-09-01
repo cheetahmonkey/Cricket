@@ -53,7 +53,7 @@ def historical_field_date(payload: Dict, field: str, snapshot_date: str) -> str:
 
 
 def restore_blocked_listing_details(date: str, listings: Iterable[Listing]) -> int:
-    """Restore last-known dealer facts only after a detail access challenge.
+    """Restore last-known dealer facts after any detail access failure.
 
     Each restored field keeps the date of the source snapshot where it was last
     directly known. A fallback snapshot can therefore be used on later runs

@@ -33,7 +33,7 @@ def visit_check(listing: Listing) -> str:
     checks = []
     fallback = listing.raw.get("historical_fallback", {})
     if isinstance(fallback, dict) and fallback.get("last_verified_date"):
-        checks.append("Recheck Carter data (last verified %s)" % fallback["last_verified_date"])
+        checks.append("Recheck dealer data (last verified %s)" % fallback["last_verified_date"])
     if listing.feature_confidence != "confirmed":
         checks.append("Verify RAB")
     if listing.history_report_url:
@@ -300,13 +300,16 @@ def dealership_sourcing_rows(source_results: List[SourceResult]) -> List[List[st
         detailed = sum(
             1 for item in result.raw_items if isinstance(item, dict) and item.get("detail_text_fetched")
         )
+        historical = sum(
+            1 for item in result.raw_items if isinstance(item, dict) and item.get("historical_fallback")
+        )
         if result.errors and found:
             status = "Partial"
         elif result.errors:
             status = "Access issue"
         else:
             status = "Active"
-        rows.append([dealership_name(result.source_name), status, str(found), str(detailed)])
+        rows.append([dealership_name(result.source_name), status, str(found), str(detailed), str(historical)])
     return rows
 
 
@@ -488,12 +491,12 @@ def generate_report(
 
     lines.append("## Dealership Sourcing Status")
     lines.append("")
-    lines.append("| Dealership | Status | Crosstreks Found | Details Checked |")
-    lines.append("| ---------- | ------ | ----------------: | --------------: |")
-    for dealer, status, found, detailed in dealership_sourcing_rows(source_results):
+    lines.append("| Dealership | Status | Crosstreks Found | Details Checked | History Used |")
+    lines.append("| ---------- | ------ | ----------------: | --------------: | -----------: |")
+    for dealer, status, found, detailed, historical in dealership_sourcing_rows(source_results):
         lines.append(
-            "| %s | %s | %s | %s |"
-            % (table_cell(dealer), table_cell(status), found, detailed)
+            "| %s | %s | %s | %s | %s |"
+            % (table_cell(dealer), table_cell(status), found, detailed, historical)
         )
     lines.append("")
 
