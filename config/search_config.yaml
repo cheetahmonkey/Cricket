@@ -22,8 +22,8 @@ pricing:
 
 top_picks_for_mom:
   max_out_the_door: 30000
-  excluded_color_families: ["black", "gray", "grey", "silver", "white"]
-  included_color_exceptions: ["cool gray khaki"]
+  excluded_color_families: ["black", "gray", "grey", "silver", "white", "cool khaki"]
+  included_color_exceptions: []
   require_known_color: true
 
 vehicle:
@@ -62,6 +62,7 @@ color_preferences:
     - "black"
     - "silver"
     - "gray"
+    - "cool khaki"
 
 search:
   initial_scope: "tier1_only"

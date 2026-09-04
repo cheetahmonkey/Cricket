@@ -136,14 +136,12 @@ def top_pick_color_is_eligible(listing: Listing, top_picks_config: Dict) -> bool
     if require_known_color and color in unknown_colors:
         return False
 
-    included_exceptions = top_picks_config.get(
-        "included_color_exceptions", ["cool gray khaki"]
-    )
+    included_exceptions = top_picks_config.get("included_color_exceptions", [])
     if any(str(exception).lower() in color for exception in included_exceptions):
         return True
 
     excluded_families = top_picks_config.get(
-        "excluded_color_families", ["black", "gray", "grey", "silver", "white"]
+        "excluded_color_families", ["black", "gray", "grey", "silver", "white", "cool khaki"]
     )
     return not any(str(family).lower() in color for family in excluded_families)
 
@@ -357,7 +355,7 @@ def generate_report(
     lines.append("## Top Picks for Mom: under $30k + Color")
     lines.append("")
     lines.append(
-        "Newest listings from the full current selection pool with estimated OTD below %s and a known color outside the black, gray/silver, and white families. Cool Gray Khaki is treated as blue. Watchlist concerns still apply."
+        "Newest listings from the full current selection pool with estimated OTD below %s and a known color outside the black, gray/silver, and white families. Cool Gray Khaki is treated as gray. Watchlist concerns still apply."
         % money(max_top_pick_otd)
     )
     if top_picks:
@@ -398,7 +396,10 @@ def generate_report(
         lines.append("")
 
     lines.append("## Top Opportunities")
+    lines.append("")
+    lines.append("Safety Features + 2020 or newer + <45k miles + clean title")
     if top:
+        lines.append("")
         lines.append("| Rank | Score | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting | Date Added |")
         lines.append("| ---: | ----: | ----- | ---- | ---- | ------ | ------------------ | ----: | ----: | -------: | ------ | --------------------- | ---------- |")
         for index, listing in enumerate(top, start=1):
@@ -421,33 +422,6 @@ def generate_report(
                 )
             )
         lines.append("")
-        for index, listing in enumerate(top, start=1):
-            lines.append(
-                "## #%d - %s Subaru Crosstrek %s - %s miles - %s"
-                % (index, listing.year or "Unknown", listing.trim or "Unknown", miles(listing.mileage), money(listing.price))
-            )
-            lines.append("")
-            lines.append("Score: %d/100  " % listing.score)
-            lines.append("Seller: %s  " % (listing.dealer_name or listing.source))
-            lines.append("Estimated out the door: %s  " % money(estimated_out_the_door(listing, pricing)))
-            lines.append("Color: %s - %s color tier  " % (listing.exterior_color or "Unknown", listing.color_score))
-            lines.append("URL: %s  " % (listing.source_url or "Unknown"))
-            lines.append("VIN: %s  " % (listing.vin or "Unknown"))
-            if listing.history_report_url:
-                lines.append("CARFAX report: %s  " % listing.history_report_url)
-            lines.append("Feature confidence: %s - %s  " % (listing.feature_confidence.title(), report_action(listing)))
-            safety_evidence = safety_evidence_summary(listing)
-            if safety_evidence:
-                lines.append("Safety evidence: %s  " % safety_evidence)
-            lines.append("")
-            lines.append("Why it ranks well:")
-            for reason in why_listing(listing):
-                lines.append("- %s" % reason)
-            lines.append("")
-            lines.append("Open questions:")
-            for question in open_questions(listing):
-                lines.append("- %s" % question)
-            lines.append("")
     else:
         lines.append("No listings qualified for the main ranked list.")
         lines.append("")

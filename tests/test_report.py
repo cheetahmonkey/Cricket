@@ -15,8 +15,8 @@ class ReportTest(unittest.TestCase):
         }
         config = {
             "max_out_the_door": 30000,
-            "excluded_color_families": ["black", "gray", "grey", "silver", "white"],
-            "included_color_exceptions": ["cool gray khaki"],
+            "excluded_color_families": ["black", "gray", "grey", "silver", "white", "cool khaki"],
+            "included_color_exceptions": [],
             "require_known_color": True,
         }
 
@@ -49,6 +49,7 @@ class ReportTest(unittest.TestCase):
             Listing(listing_id="white", exterior_color="Crystal White Pearl", price=22000, first_seen_date="2026-07-13"),
             Listing(listing_id="black", exterior_color="Crystal Black Silica", price=22000, first_seen_date="2026-07-13"),
             Listing(listing_id="grey", exterior_color="Cool Grey Khaki", price=22000, first_seen_date="2026-07-13"),
+            Listing(listing_id="cool-khaki-short", exterior_color="Cool Khaki", price=22000, first_seen_date="2026-07-13"),
             Listing(listing_id="silver", exterior_color="Ice Silver Metallic", price=22000, first_seen_date="2026-07-13"),
             Listing(listing_id="unknown", exterior_color="", price=22000, first_seen_date="2026-07-13"),
             # This rounds to exactly $30,000 OTD, so it does not satisfy "less than".
@@ -64,7 +65,7 @@ class ReportTest(unittest.TestCase):
 
         self.assertEqual(
             [listing.listing_id for listing in picks],
-            ["cool-khaki", "green", "red", "blue"],
+            ["green", "red", "blue"],
         )
 
     def test_top_picks_table_keeps_watchlist_concern_visible(self):
@@ -99,8 +100,8 @@ class ReportTest(unittest.TestCase):
                     },
                     top_picks_config={
                         "max_out_the_door": 30000,
-                        "excluded_color_families": ["black", "gray", "grey", "silver", "white"],
-                        "included_color_exceptions": ["cool gray khaki"],
+                        "excluded_color_families": ["black", "gray", "grey", "silver", "white", "cool khaki"],
+                        "included_color_exceptions": [],
                         "require_known_color": True,
                     },
                 )
@@ -210,20 +211,22 @@ class ReportTest(unittest.TestCase):
         self.assertIn("Removed watchlist: [2024 Premium, 28,368 mi, $26,080, Carter Shoreline](https://example.test/removed)", text)
         self.assertIn("## Cricket's Morning Note", text)
         self.assertIn("Top opportunities changed: 1 added and 0 removed.", text)
+        self.assertIn(
+            "## Top Opportunities\n\nSafety Features + 2020 or newer + <45k miles + clean title\n\n| Rank |",
+            text,
+        )
         self.assertIn("| Rank | Score | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting | Date Added |", text)
         self.assertIn(
             "| 1 | 73 | [Magnetite Gray Metallic](https://example.test/good) | 2025 | Limited | RAB, BSD, RCTA | confirmed | 11,196 | $31,080 | $35,399 | Carter Shoreline | [Open CARFAX](https://example.test/carfax) + Final OTD | 2026-07-09 |",
             text,
         )
-        self.assertIn(
-            "Safety evidence: RAB: Automatic emergency braking (rear); BSD: Blind spot safety (sensor/alert); RCTA: Cross traffic alert (rear)",
-            text,
-        )
+        self.assertNotIn("## #1 -", text)
+        self.assertNotIn("Why it ranks well:", text)
+        self.assertNotIn("Open questions:", text)
         self.assertEqual(
             report.safe_evidence_text('<div id="detailed-specs">Blind spot detection</div>'),
             "confirmed in dealer specifications",
         )
-        self.assertIn("CARFAX report: https://example.test/carfax", text)
         self.assertNotIn("Vehicle history:", text)
         self.assertIn("Cricket is keeping 1 listing visible for comparison", text)
         self.assertIn("| # | Main Concern | Color | Year | Trim | Safety | Feature Confidence | Miles | Price | Est. OTD | Seller | Check Before Visiting | Date Added |", text)

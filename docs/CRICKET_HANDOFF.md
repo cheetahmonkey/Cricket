@@ -21,9 +21,9 @@ derived from the same Markdown report, not maintained as separate reports.
   budget ceiling for the Top Picks for Mom view, not a hard filter on the two
   existing selection-pool tables.
 - Color has increased importance in Top Picks for Mom: require a known color
-  outside the black, gray/grey (including silver), and white families. Treat
-  Cool Gray Khaki as part of the blue family. Non-white pearl colors such as
-  blue pearl or red pearl remain eligible.
+  outside the black, gray/grey (including silver and Cool Gray Khaki), and
+  white families. Non-white pearl colors such as blue pearl or red pearl
+  remain eligible.
 - The broader scoring system still prefers blue/teal, then burgundy/green,
   then white. Black, silver, and gray remain visible in the existing tables.
 - Carter Shoreline and Carter Ballard are preferred sellers; other Subaru
@@ -98,14 +98,18 @@ The report must remain practical for Mom and family, not a technical run log.
 - Keep `Top Picks for Mom: under $30k + Color` as the first table. Its pool is the union of Top
   Opportunities and Other Listings to Keep in View. Include only listings with
   known colors outside the black, gray/grey/silver, and white families and
-  estimated OTD strictly below $30,000. Cool Gray Khaki is an explicit eligible
-  exception. Sort by `Date Added` newest first. Do not remove
+  estimated OTD strictly below $30,000. Cool Gray Khaki belongs to the gray
+  family and is excluded. Sort by `Date Added` newest first. Do not remove
   matching rows from either existing table, and show `Main Concern` because a
   Top Pick may still be a watchlist listing.
 - Top Opportunities and Other Listings tables both use this order at the left:
   rank/number, score or concern, direct linked color, year, trim, safety,
   feature confidence, miles, price, estimated OTD, seller, visit check, and
   `Date Added` at the far right.
+- The Top Opportunities table is the complete presentation for those cars. Do
+  not append individual vehicle narrative sections after it. Directly beneath
+  its heading, show the subtitle `Safety Features + 2020 or newer + <45k miles
+  + clean title`.
 - The color text itself links directly to the dealer detail page. Do not use
   footnote-style links.
 - Safety column shows only confirmed RAB, BSD, and RCTA. `Feature Confidence`

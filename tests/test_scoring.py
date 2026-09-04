@@ -1,7 +1,7 @@
 import unittest
 
 from cricket.models import Listing
-from cricket.scoring import apply_hard_filters, infer_features, score_listing
+from cricket.scoring import apply_hard_filters, classify_color, infer_features, score_listing
 
 
 CONFIG = {
@@ -10,12 +10,16 @@ CONFIG = {
         "highest": ["blue", "teal"],
         "med_high": ["burgundy", "green"],
         "med": ["white"],
-        "low": ["black", "silver", "gray"],
+        "low": ["black", "silver", "gray", "cool khaki"],
     },
 }
 
 
 class ScoringTest(unittest.TestCase):
+    def test_cool_khaki_variants_are_low_gray_family(self):
+        self.assertEqual(classify_color("Cool Gray Khaki", CONFIG), "low")
+        self.assertEqual(classify_color("Cool Khaki", CONFIG), "low")
+
     def test_limited_likely_rab_scores_and_passes_filters(self):
         listing = Listing(
             source="test",
