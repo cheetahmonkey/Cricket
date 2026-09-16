@@ -1,7 +1,7 @@
 import re
 import xml.etree.ElementTree as ET
 from html import unescape
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 from ..models import SourceResult
 from ..normalize import normalize_items
@@ -24,6 +24,45 @@ class CarterSource(SourceAdapter):
     def sitemap_urls(self) -> List[str]:
         return self.config.get("sitemap_urls") or []
 
+    def load_sitemap_items(self, sitemap_url: str) -> Tuple[List[Dict], Optional[str]]:
+        """Load a sitemap, using the configured mirror only when needed."""
+        primary_error = None
+        try:
+            sitemap_text = self.fetch(sitemap_url)
+            raw_items = self.parse_sitemap(sitemap_text, sitemap_url)
+            if raw_items:
+                return raw_items, None
+        except (ET.ParseError, OSError) as exc:
+            primary_error = str(exc)
+
+        fallback_template = self.config.get("sitemap_fallback_url_template")
+        if not fallback_template:
+            if primary_error:
+                return [], "%s: %s" % (sitemap_url, primary_error)
+            return [], None
+
+        fallback_url = fallback_template.format(url=sitemap_url)
+        try:
+            fallback_text = self.fetch(fallback_url)
+            raw_items = self.parse_sitemap(fallback_text, sitemap_url)
+        except (ET.ParseError, OSError) as exc:
+            primary_summary = primary_error or "no inventory candidates"
+            return [], "%s: %s; sitemap fallback failed: %s" % (
+                sitemap_url,
+                primary_summary,
+                exc,
+            )
+
+        if not raw_items:
+            primary_summary = primary_error or "no inventory candidates"
+            return [], "%s: %s; sitemap fallback discovered no inventory candidates" % (
+                sitemap_url,
+                primary_summary,
+            )
+
+        primary_summary = primary_error or "no inventory candidates"
+        return raw_items, "%s: %s; sitemap fallback used" % (sitemap_url, primary_summary)
+
     def search(self) -> SourceResult:
         if not self.sitemap_urls():
             return super().search()
@@ -33,9 +72,10 @@ class CarterSource(SourceAdapter):
         enriched_count = 0
         blocked_count = 0
         for sitemap_url in self.sitemap_urls():
+            raw_items, sitemap_limitation = self.load_sitemap_items(sitemap_url)
+            if sitemap_limitation:
+                result.errors.append(sitemap_limitation)
             try:
-                xml_text = self.fetch(sitemap_url)
-                raw_items = self.parse_sitemap(xml_text, sitemap_url)
                 unique_items = []
                 for item in raw_items:
                     key = item.get("listing_id") or item["url"]

@@ -17,6 +17,7 @@ class StorageTest(unittest.TestCase):
                 prior = Listing(
                     listing_id="carter-1",
                     source="Carter source",
+                    trim="Limited",
                     price=28168,
                     mileage=32356,
                     exterior_color="Crystal Black Silica",
@@ -36,6 +37,7 @@ class StorageTest(unittest.TestCase):
                 storage.NORMALIZED_DIR = original_normalized_dir
 
         self.assertEqual(restored, 1)
+        self.assertEqual(blocked.trim, "Limited")
         self.assertEqual(blocked.price, 28168)
         self.assertEqual(blocked.mileage, 32356)
         self.assertEqual(blocked.exterior_color, "Crystal Black Silica")

@@ -38,8 +38,8 @@ the buyer rules based only on this handoff.
 | --- | --- | --- | --- |
 | Carter Subaru Shoreline | Active | Carter inventory sitemaps | Jina text mirror, with direct fallback for missing price |
 | Carter Subaru Ballard | Active | Carter inventory sitemaps | Jina text mirror, with direct fallback for missing price |
-| Renton Subaru | Active | Public sitemap through Jina's Markdown sitemap view | Direct public detail HTML via `curl -Ls` |
-| Subaru of Puyallup | Active | Public sitemap through Jina's Markdown sitemap view | Direct public detail HTML via `curl -Ls` |
+| Renton Subaru | Active | Public sitemap, with automatic Jina Markdown fallback | Direct public detail HTML via `curl -Ls` |
+| Subaru of Puyallup | Active | Public sitemap, with automatic Jina Markdown fallback | Direct public detail HTML via `curl -Ls` |
 | Subaru Certified Pre-Owned | Active as a supplemental source | Subaru CPO landing page | Often returns no individual listings; not a dealership row |
 
 As of the July 20, 2026 report, Renton had 7 in-scope vehicles fully detailed
@@ -59,6 +59,10 @@ which intentionally do not receive detail enrichment.
 - Their raw sitemap candidates are retained in `data/listings_raw/`, while only
   detail-enriched candidates enter the normalized snapshot/report. This keeps
   unknown placeholder records out of the family-facing tables.
+- If a direct sitemap is denied or unexpectedly returns no Crosstrek
+  candidates, `sitemap_fallback_url_template` retries discovery through the
+  Jina Markdown mirror. Detail fields, including trim, are restored from the
+  newest known historical snapshot when the dealer detail page is blocked.
 - Standard dealer pages carry useful fields in embedded HTML/JSON. The parser
   reads `internetPrice`, asking-price text, odometer, quick specs, HTML title,
   and embedded `title` metadata. Do not assume that a missing visible text field

@@ -13,6 +13,7 @@ DB_PATH = DATA_DIR / "listings_history.sqlite"
 
 
 HISTORICAL_DETAIL_FIELDS = (
+    "trim",
     "price",
     "mileage",
     "exterior_color",

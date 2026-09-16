@@ -120,6 +120,7 @@ sources:
       distance_miles: 31
       sitemap_urls:
         - "https://www.rentonsubaru.com/sitemap.xml"
+      sitemap_fallback_url_template: "https://r.jina.ai/http://r.jina.ai/http://{url}"
       fetch_via_curl: true
       minimum_detail_year: 2020
       normalize_only_enriched: true
@@ -132,6 +133,7 @@ sources:
       distance_miles: 52
       sitemap_urls:
         - "https://www.subaruofpuyallup.com/sitemap.xml"
+      sitemap_fallback_url_template: "https://r.jina.ai/http://r.jina.ai/http://{url}"
       fetch_via_curl: true
       minimum_detail_year: 2020
       normalize_only_enriched: true

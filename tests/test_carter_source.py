@@ -259,6 +259,60 @@ class CarterSourceTest(unittest.TestCase):
         self.assertEqual(items[0]["year"], 2024)
         self.assertTrue(items[0]["cpo"])
 
+    def test_sitemap_source_uses_mirror_after_primary_access_failure(self):
+        sitemap = """
+        [https://www.rentonsubaru.com/used/Subaru/2023-Subaru-Crosstrek-for-sale-renton-wa-220f5f41ac1818e146e9333f21686f37.htm](https://www.rentonsubaru.com/used/Subaru/2023-Subaru-Crosstrek-for-sale-renton-wa-220f5f41ac1818e146e9333f21686f37.htm)
+        """
+
+        class FallbackLocalSource(LocalSubaruSource):
+            def fetch(self, url):
+                if url == "https://example.test/sitemap.xml":
+                    raise OSError("HTTP Error 403: Forbidden")
+                return sitemap
+
+            def enrich_from_detail_text(self, raw, enriched_count=0):
+                raw["detail_text_fetched"] = True
+                return raw
+
+        source = FallbackLocalSource(
+            {
+                "name": "Renton Subaru used inventory",
+                "sitemap_urls": ["https://example.test/sitemap.xml"],
+                "sitemap_fallback_url_template": "https://mirror.example/{url}",
+            }
+        )
+        result = source.search()
+        self.assertEqual(len(result.raw_items), 1)
+        self.assertEqual(len(result.listings), 1)
+        self.assertIn("sitemap fallback used", result.errors[0])
+
+    def test_sitemap_source_uses_mirror_after_empty_primary_result(self):
+        sitemap = """
+        [https://www.subaruofpuyallup.com/certified/Subaru/2024-Subaru-Crosstrek-for-sale-Tacoma-WA-1f0a8262ac1818e146e9333f01ffb9c6.htm](https://www.subaruofpuyallup.com/certified/Subaru/2024-Subaru-Crosstrek-for-sale-Tacoma-WA-1f0a8262ac1818e146e9333f01ffb9c6.htm)
+        """
+
+        class EmptyPrimaryLocalSource(LocalSubaruSource):
+            def fetch(self, url):
+                if url == "https://example.test/sitemap.xml":
+                    return "<?xml version=\"1.0\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" />"
+                return sitemap
+
+            def enrich_from_detail_text(self, raw, enriched_count=0):
+                raw["detail_text_fetched"] = True
+                return raw
+
+        source = EmptyPrimaryLocalSource(
+            {
+                "name": "Subaru of Puyallup used inventory",
+                "sitemap_urls": ["https://example.test/sitemap.xml"],
+                "sitemap_fallback_url_template": "https://mirror.example/{url}",
+            }
+        )
+        result = source.search()
+        self.assertEqual(len(result.raw_items), 1)
+        self.assertEqual(len(result.listings), 1)
+        self.assertIn("no inventory candidates; sitemap fallback used", result.errors[0])
+
     def test_sitemap_only_source_does_not_fallback_to_missing_search_page(self):
         class EmptyLocalSource(LocalSubaruSource):
             def fetch(self, url):
